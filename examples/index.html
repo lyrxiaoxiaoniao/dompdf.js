@@ -611,6 +611,84 @@
               <div class="report-section-head">
                 <div class="report-section-index">06</div>
                 <div>
+                  <div class="report-section-kicker">Color</div>
+                  <h2>OKLCH 色彩空间测试</h2>
+                  <p class="report-section-summary cn-copy">
+                    以下色块、文字、边框和渐变全部使用 CSS oklch() 颜色函数定义，用于验证 dompdf.js 对现代 CSS 色彩空间的解析能力（库内独立转换，不依赖浏览器 canvas）。
+                  </p>
+                </div>
+              </div>
+
+              <div class="rich-grid">
+                <section class="rich-card">
+                  <h3>色相轮 (Hue Sweep)</h3>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 0);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 30);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 60);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 90);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 120);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 150);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 180);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 210);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 240);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 270);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 300);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 330);border-radius:4px"></div>
+                  </div>
+                </section>
+
+                <section class="rich-card">
+                  <h3>亮度与彩度</h3>
+                  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                    <div style="width:48px;height:48px;background:oklch(0.3 0.1 250);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.45 0.1 250);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.6 0.1 250);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.75 0.1 250);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.9 0.1 250);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.05 250);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.15 250);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.25 250);border-radius:4px"></div>
+                    <div style="width:48px;height:48px;background:oklch(0.65 0.35 250);border-radius:4px"></div>
+                  </div>
+                </section>
+              </div>
+
+              <section class="rich-card" style="margin-top:12px">
+                <h3>文字与边框</h3>
+                <p style="color:oklch(0.55 0.2 25);font-size:16px;font-weight:600;margin:8px 0">oklch 暖红文字 (L=0.55 C=0.2 H=25)</p>
+                <p style="color:oklch(0.5 0.15 145);font-size:16px;font-weight:600;margin:8px 0">oklch 翠绿文字 (L=0.5 C=0.15 H=145)</p>
+                <p style="color:oklch(0.6 0.2 265);font-size:16px;font-weight:600;margin:8px 0">oklch 蓝紫文字 (L=0.6 C=0.2 H=265)</p>
+                <div style="border:3px solid oklch(0.6 0.2 90);padding:10px;margin-top:8px;border-radius:4px">
+                  <p style="margin:0">oklch 边框容器 (H=90 黄绿)</p>
+                </div>
+                <div style="border:3px solid oklch(0.5 0.2 350);padding:10px;margin-top:8px;border-radius:4px">
+                  <p style="margin:0">oklch 边框容器 (H=350 玫红)</p>
+                </div>
+              </section>
+
+              <section class="rich-card" style="margin-top:12px">
+                <h3>透明度与百分比语法</h3>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                  <div style="flex:1;height:40px;background:oklch(0.6 0.2 200 / 1);border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">alpha 1</div>
+                  <div style="flex:1;height:40px;background:oklch(0.6 0.2 200 / 0.7);border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">alpha 0.7</div>
+                  <div style="flex:1;height:40px;background:oklch(0.6 0.2 200 / 0.4);border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">alpha 0.4</div>
+                  <div style="flex:1;height:40px;background:oklch(0.6 0.2 200 / 0.15);border-radius:4px;display:flex;align-items:center;justify-content:center;color:#333;font-size:12px">alpha 0.15</div>
+                </div>
+                <p style="margin-top:10px">百分比语法：<span style="background:oklch(70% 20% 200);padding:2px 8px;border-radius:3px;color:#fff">oklch(70% 20% 200)</span></p>
+              </section>
+
+              <section class="rich-card" style="margin-top:12px">
+                <h3>OKLCH 渐变</h3>
+                <div style="height:40px;background:linear-gradient(90deg, oklch(0.6 0.25 0), oklch(0.6 0.25 90), oklch(0.6 0.25 180), oklch(0.6 0.25 270), oklch(0.6 0.25 360));border-radius:4px;margin-top:8px"></div>
+                <div style="height:40px;background:linear-gradient(90deg, oklch(0.4 0.1 280), oklch(0.7 0.2 280), oklch(0.9 0.05 280));border-radius:4px;margin-top:6px"></div>
+              </section>
+            </section>
+
+            <section class="report-section">
+              <div class="report-section-head">
+                <div class="report-section-index">07</div>
+                <div>
                   <div class="report-section-kicker">Pagination</div>
                   <h2>分页压力测试与附录</h2>
                   <p class="report-section-summary cn-copy">
