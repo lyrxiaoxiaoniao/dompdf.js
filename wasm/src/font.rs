@@ -6,7 +6,7 @@
 
 use crate::snapshot::FontResource;
 use crate::ttf::TtfFont;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Adobe Helvetica AFM widths for the WinAnsi (CP1252) byte range 0x00..=0xFF.
 /// Values are in 1/1000 em. ASCII range is accurate; high bytes default to 500.
@@ -180,7 +180,7 @@ pub struct CidFont {
     pub weight: u16,
     pub italic: u8,
     pub ttf: TtfFont,
-    pub used_gids: std::cell::RefCell<Vec<u16>>,
+    pub used_gids: std::cell::RefCell<HashSet<u16>>,
     pub gid_to_unicode: HashMap<u16, u32>, // reverse cmap for ToUnicode (built lazily)
     pub used_gid_to_unicode: std::cell::RefCell<HashMap<u16, u32>>,
     pub subset_old_to_new: std::cell::RefCell<Option<HashMap<u16, u16>>>,
@@ -229,7 +229,7 @@ impl FontCtx {
                 weight: r.weight,
                 italic: r.style,
                 ttf,
-                used_gids: std::cell::RefCell::new(Vec::new()),
+                used_gids: std::cell::RefCell::new(HashSet::new()),
                 gid_to_unicode: rev,
                 used_gid_to_unicode: std::cell::RefCell::new(HashMap::new()),
                 subset_old_to_new: std::cell::RefCell::new(None),
@@ -299,10 +299,7 @@ impl FontCtx {
                 (Some(primary_idx), self.cid[primary_idx].ttf.width_1000(0))
             };
             if record && gid != 0 {
-                let mut used = self.cid[font_idx].used_gids.borrow_mut();
-                if !used.contains(&gid) {
-                    used.push(gid);
-                }
+                self.cid[font_idx].used_gids.borrow_mut().insert(gid);
                 self.cid[font_idx]
                     .used_gid_to_unicode
                     .borrow_mut()
@@ -336,18 +333,19 @@ impl FontCtx {
 
     pub fn prepare_subset_maps(&self) {
         for cf in self.cid.iter() {
-            let mut used = cf.used_gids.borrow().clone();
-            if !used.contains(&0) {
-                used.push(0);
-            }
+            // Collect used gids into a sorted, deduped Vec for subset mapping.
+            let mut used: Vec<u16> = cf.used_gids.borrow().iter().copied().collect();
             used.sort_unstable();
             used.dedup();
-            *cf.used_gids.borrow_mut() = used.clone();
+            if !used.contains(&0) {
+                used.insert(0, 0);
+            }
             let map: HashMap<u16, u16> = used
-                .into_iter()
+                .iter()
                 .enumerate()
-                .map(|(new_gid, old_gid)| (old_gid, new_gid as u16))
+                .map(|(new_gid, &old_gid)| (old_gid, new_gid as u16))
                 .collect();
+            *cf.used_gids.borrow_mut() = used.iter().copied().collect();
             *cf.subset_old_to_new.borrow_mut() = Some(map);
         }
     }
@@ -463,9 +461,7 @@ pub fn encode_cid(cf: &CidFont, text: &str) -> (Vec<u8>, u32) {
         bytes.push((draw_gid >> 8) as u8);
         bytes.push((draw_gid & 0xff) as u8);
         width += cf.ttf.width_1000(old_gid);
-        if !used.contains(&old_gid) {
-            used.push(old_gid);
-        }
+        used.insert(old_gid);
         if old_gid != 0 {
             cf.used_gid_to_unicode
                 .borrow_mut()

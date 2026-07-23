@@ -76,16 +76,27 @@ fn f(x: f32) -> String {
     if r == 0.0 {
         return "0".to_string();
     }
-    let s = format!("{:.*}", p as usize, r);
-    s.trim_end_matches('0')
-        .trim_end_matches('.')
-        .to_string()
+    // Write directly into a pre-allocated String (avoids the intermediate
+    // format! String + trim_end_matches().to_string() allocation chain).
+    use core::fmt::Write;
+    let mut s = String::with_capacity(8);
+    write!(s, "{:.*}", p as usize, r).unwrap();
+    // In-place trim of trailing zeros and dangling dot.
+    while s.ends_with('0') {
+        s.pop();
+    }
+    if s.ends_with('.') {
+        s.pop();
+    }
+    s
 }
 
 fn hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
     let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push_str(&format!("{:02X}", b));
+    for &b in bytes {
+        s.push(HEX[(b >> 4) as usize] as char);
+        s.push(HEX[(b & 0x0f) as usize] as char);
     }
     s
 }
@@ -2061,7 +2072,7 @@ pub fn build_pdf(
         }
 
         // FontFile2
-        let used = cf.used_gids.borrow();
+        let used: Vec<u16> = cf.used_gids.borrow().iter().copied().collect();
         let embed = cf.ttf.embed_bytes(&used);
         if compress {
             let ff2_comp = crate::deflate::zlib_deflate(&embed);

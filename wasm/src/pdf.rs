@@ -91,21 +91,23 @@ impl PdfWriter {
     /// (e.g. `/Width 800`). /Length is added automatically.
     pub fn stream(&mut self, id: u32, dict_extra: &str, data: &[u8]) {
         self.begin_obj(id);
-        let payload = if let Some(security) = &self.security {
+        let payload: Vec<u8>;
+        let bytes: &[u8] = if let Some(security) = &self.security {
             if Some(id) == self.encrypt_id {
-                data.to_vec()
+                data
             } else {
-                security.encrypt_bytes(id, 0, data)
+                payload = security.encrypt_bytes(id, 0, data);
+                &payload
             }
         } else {
-            data.to_vec()
+            data
         };
         self.put(&format!(
             "<< /Length {}{} >>\nstream\n",
-            payload.len(),
+            bytes.len(),
             dict_extra
         ));
-        self.put_bytes(&payload);
+        self.put_bytes(bytes);
         self.put("\nendstream");
         self.end_obj();
     }
@@ -115,21 +117,23 @@ impl PdfWriter {
     /// /Filter or /Length (this method adds /Filter /FlateDecode and /Length).
     pub fn stream_compressed(&mut self, id: u32, dict_extra: &str, compressed: &[u8]) {
         self.begin_obj(id);
-        let payload = if let Some(security) = &self.security {
+        let payload: Vec<u8>;
+        let bytes: &[u8] = if let Some(security) = &self.security {
             if Some(id) == self.encrypt_id {
-                compressed.to_vec()
+                compressed
             } else {
-                security.encrypt_bytes(id, 0, compressed)
+                payload = security.encrypt_bytes(id, 0, compressed);
+                &payload
             }
         } else {
-            compressed.to_vec()
+            compressed
         };
         self.put(&format!(
             "<< /Length {} /Filter /FlateDecode{} >>\nstream\n",
-            payload.len(),
+            bytes.len(),
             dict_extra
         ));
-        self.put_bytes(&payload);
+        self.put_bytes(bytes);
         self.put("\nendstream");
         self.end_obj();
     }
