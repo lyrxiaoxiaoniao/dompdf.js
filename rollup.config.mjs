@@ -17,7 +17,7 @@ const banner = `/*!
 const sharedPlugins = (tsOptions = {}) => [
   resolve({ exportConditions: ['browser', 'module', 'import', 'default'] }),
   commonjs({ include: 'node_modules/**' }),
-  typescript({ sourceMap: true, inlineSources: true, declaration: false, ...tsOptions }),
+  typescript({ sourceMap: true, inlineSources: false, declaration: false, ...tsOptions }),
 ];
 
 /**
@@ -101,13 +101,28 @@ const umdConfig = {
 // ESM build: code-splitting allowed
 const esmConfig = {
   input: 'src/index.ts',
-  output: {
-    dir: 'dist/esm',
-    format: 'esm',
-    entryFileNames: 'dompdf.esm.js',
-    banner,
-    sourcemap: true,
-  },
+  output: [
+    {
+      dir: 'dist/esm',
+      format: 'esm',
+      entryFileNames: 'dompdf.esm.js',
+      banner,
+      sourcemap: true,
+    },
+    {
+      dir: 'dist/esm',
+      format: 'esm',
+      entryFileNames: 'dompdf.esm.min.js',
+      banner,
+      sourcemap: true,
+      plugins: [
+        terser({
+          compress: { drop_console: true, passes: 2 },
+          format: { comments: /^!/ },
+        }),
+      ],
+    },
+  ],
   plugins: [
     ...sharedPlugins({ outDir: 'dist/esm', declaration: false, declarationDir: undefined }),
     inlineWorker(),
