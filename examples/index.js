@@ -1,4 +1,4 @@
-﻿﻿﻿(function () {
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿(function () {
   /* ========================= Globals ========================= */
   var api = window.dompdf;
   var markedApi = window.marked;
@@ -6,6 +6,7 @@
 
   var statusDotEl = document.getElementById('status-dot');
   var statusTextEl = document.getElementById('status-text');
+  var topLoadingOverlayEl = document.getElementById('top-loading-overlay');
   var topLoadingTextEl = document.getElementById('top-loading-text');
   var docEl = document.getElementById('document');
   var topbarPageInfo = document.getElementById('topbar-page-info');
@@ -114,6 +115,7 @@
     statusTextEl.textContent = text;
     statusDotEl.className = 'status-dot loading';
     showTopLoading(text);
+  }
 
   function updateDompdfProgressStatus(progress) {
     if (!progress || !progress.stage) return;
@@ -151,11 +153,11 @@
     document.getElementById('benchmark-mode-light').classList.toggle('active', benchmarkMode === 'light');
     document.getElementById('benchmark-mode-heavy').classList.toggle('active', benchmarkMode === 'heavy');
     document.getElementById('benchmark-mode-extreme').classList.toggle('active', benchmarkMode === 'extreme');
+    benchmarkMetaEl.textContent = (benchmarkMode === 'extreme')
           ? (benchmarkBuildInProgress
             ? '当前模式：10000页测试 · 正在生成 8940 组超长文本'
             : '当前模式：10000页测试 · 8940 组超长文本') + (benchmarkCompressEnabled ? ' · 压缩开启' : ' · 压缩关闭')
           : ('当前模式：重压测 · 440 组超长文本' + (benchmarkCompressEnabled ? ' · 压缩开启' : ' · 压缩关闭'));
-    }
   }
 
   function rebuildBenchmarkSample() {
@@ -734,8 +736,8 @@
           setStatus(
             'html2pdf.js 导出完成 · ' +
             formatDuration(result.durationMs) + ' · ' +
-            formatBytes(result.sizeBytes) +
-      return ensureBenchmarkSampleReady()
+            formatBytes(result.sizeBytes)
+          );
         })
         .catch(function (err) {
           setStatus('error: ' + err.message, true);
@@ -746,6 +748,7 @@
           else if (target) cleanupTarget(target);
         });
     });
+
   };
 
   window.runCompare = function () {
@@ -769,7 +772,7 @@
           target = null;
           htmlTarget = getHtml2PdfTarget();
           return measureEngine('html2pdf', function () { return renderWithHtml2Pdf(htmlTarget); })
-      return ensureBenchmarkSampleReady()
+            .then(function () {
               setStatus(
                 generatedBlobs.html2pdf && generatedBlobs.html2pdf.blankPdfSuspected
                   ? '对比完成 · html2pdf.js 疑似空白PDF'
@@ -1036,8 +1039,6 @@
     });
   }
 
-  }
-
   function scheduleMdRender() {
     clearTimeout(mdRenderTimer);
     mdRenderTimer = setTimeout(renderMarkdownNow, 90);
@@ -1142,4 +1143,4 @@
         hasFontBytes: !!sharedFontConfig.fontBytes
       });
     });
-
+})();
