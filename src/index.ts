@@ -90,6 +90,7 @@ type WorkerMessage = WorkerResultResponse | WorkerProgressResponse;
 
 interface PendingRequest {
   resolve: (res: WorkerResultResponse) => void;
+  reject: (err: Error) => void;
   onProgress?: (progress: ExportProgress) => void;
 }
 
@@ -121,6 +122,12 @@ function getWorker(): Worker {
     };
     worker.onerror = (e) => {
       console.error('dompdf worker error', e);
+      // Reject all in-flight requests so their Promises and closures (snapshot
+      // buffers, onProgress) can be released instead of hanging forever.
+      const err = new Error('dompdf worker crashed');
+      for (const req of pending.values()) req.reject(err);
+      pending.clear();
+      worker = null;
     };
   }
   return worker;
@@ -134,8 +141,8 @@ function callWorker(
   },
 ): Promise<WorkerResultResponse> {
   const id = ++seq;
-  return new Promise((resolve) => {
-    pending.set(id, { resolve, onProgress: options?.onProgress });
+  return new Promise<WorkerResultResponse>((resolve, reject) => {
+    pending.set(id, { resolve, reject, onProgress: options?.onProgress });
     // Transfer the snapshot buffer (we don't need it on the main thread after).
     const transfer = snapshot.buffer.byteLength > 0 ? [snapshot.buffer] : [];
     getWorker().postMessage({ id, op, snapshot }, transfer);
