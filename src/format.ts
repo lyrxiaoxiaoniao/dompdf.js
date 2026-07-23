@@ -3,6 +3,9 @@
  * All integers little-endian; floats = f32 LE.
  */
 
+// Shared TextEncoder to avoid per-call allocation (called hundreds of times per export).
+let sharedTextEncoder: TextEncoder | null = null;
+
 export class BinWriter {
   private buf: Uint8Array;
   private dv: DataView;
@@ -67,7 +70,8 @@ export class BinWriter {
     return n;
   }
   utf8(s: string) {
-    this.bytes(new TextEncoder().encode(s));
+    if (!sharedTextEncoder) sharedTextEncoder = new TextEncoder();
+    this.bytes(sharedTextEncoder.encode(s));
   }
 
   result(): Uint8Array {
