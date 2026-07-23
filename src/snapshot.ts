@@ -605,13 +605,45 @@ function positionNum(p: ContentPosition | undefined): number {
 // ---- color parsing via canvas ----
 const colorCanvas = typeof document !== 'undefined' ? document.createElement('canvas') : null;
 const colorCtx = colorCanvas ? colorCanvas.getContext('2d')! : null;
+const colorCache = new Map<string, [number, number, number, number]>();
 
 function parseColor(str: string | null | undefined): [number, number, number, number] {
   if (!colorCtx) return [0, 0, 0, 1];
   if (!str) return [0, 0, 0, 0];
-  colorCtx.fillStyle = '#000';
-  colorCtx.fillStyle = str;
-  const f = colorCtx.fillStyle;
+  const cached = colorCache.get(str);
+  if (cached) return cached;
+  let result: [number, number, number, number];
+  // Fast path for #rrggbb / #rgb (avoids canvas round-trip).
+  if (str.charCodeAt(0) === 35 /* '#' */) {
+    const hex = str.slice(1);
+    if (hex.length === 6) {
+      result = [
+        parseInt(hex.slice(0, 2), 16) / 255,
+        parseInt(hex.slice(2, 4), 16) / 255,
+        parseInt(hex.slice(4, 6), 16) / 255,
+        1,
+      ];
+    } else if (hex.length === 3) {
+      result = [
+        parseInt(hex[0] + hex[0], 16) / 255,
+        parseInt(hex[1] + hex[1], 16) / 255,
+        parseInt(hex[2] + hex[2], 16) / 255,
+        1,
+      ];
+    } else {
+      result = parseColorViaCanvas(str);
+    }
+  } else {
+    result = parseColorViaCanvas(str);
+  }
+  colorCache.set(str, result);
+  return result;
+}
+
+function parseColorViaCanvas(str: string): [number, number, number, number] {
+  colorCtx!.fillStyle = '#000';
+  colorCtx!.fillStyle = str;
+  const f = colorCtx!.fillStyle;
   if (typeof f === 'string' && f.startsWith('#')) {
     return [
       parseInt(f.slice(1, 3), 16) / 255,
@@ -659,11 +691,15 @@ function borderStyleNum(style: string): number {
 }
 
 function clipsOverflow(cs: CSSStyleDeclaration): boolean {
-  const values = [cs.overflow, cs.overflowX, cs.overflowY]
-    .flatMap((value) => (value || '').split(/\s+/))
-    .map((value) => value.trim())
-    .filter(Boolean);
-  return values.some((value) => value === 'hidden' || value === 'clip' || value === 'scroll' || value === 'auto');
+  const check = (value: string): boolean => {
+    const parts = (value || '').split(/\s+/);
+    for (let i = 0; i < parts.length; i++) {
+      const v = parts[i];
+      if (v === 'hidden' || v === 'clip' || v === 'scroll' || v === 'auto') return true;
+    }
+    return false;
+  };
+  return check(cs.overflow) || check(cs.overflowX) || check(cs.overflowY);
 }
 
 function utf8LenCP(cp: number): number {
@@ -1717,37 +1753,22 @@ function convertBackgroundImageToImage(
     .filter((layer): layer is PreparedGradientLayer => !!layer);
   if (layers.length === 0) return null;
 
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return null;
-  const imageData = ctx.createImageData(w, h);
-  const data = imageData.data;
+  const rgb = new Uint8Array(w * h * 3);
   const base = blendOver([1, 1, 1, 1], fallbackBg ?? [1, 1, 1, 1]);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const idx = (y * w + x) * 4;
+      const idx = (y * w + x) * 3;
       let out = base;
       for (let i = layers.length - 1; i >= 0; i--) {
         out = blendOver(out, sampleGradientLayer(layers[i], x, y));
       }
-      data[idx] = Math.round(out[0] * 255);
-      data[idx + 1] = Math.round(out[1] * 255);
-      data[idx + 2] = Math.round(out[2] * 255);
-      data[idx + 3] = 255;
+      rgb[idx] = Math.round(out[0] * 255);
+      rgb[idx + 1] = Math.round(out[1] * 255);
+      rgb[idx + 2] = Math.round(out[2] * 255);
     }
   }
-
-  // Pack the RGBA buffer we just computed straight to lossless RGB888 — no
-  // canvas/JPEG round-trip, so gradient colors stay exact.
-  const rgb = new Uint8Array(w * h * 3);
-  for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
-    rgb[j] = data[i];
-    rgb[j + 1] = data[i + 1];
-    rgb[j + 2] = data[i + 2];
-  }
   return { bytes: rgb, width: w, height: h, format: IMG_RAW_RGB };
+
 }
 
 interface ResolvedHF {
@@ -2367,14 +2388,24 @@ function buildInlineRunsWithLangFont(
     renderMode = 0,
   ) {
     if (!text || lines.length === 0) return;
+    // Single-pass min/max to avoid 4 array allocations + spread stack risk.
+    let maxRight = lines[0].x + lines[0].w, minLeft = lines[0].x;
+    let maxBottom = lines[0].y + lines[0].h, minTop = lines[0].y;
+    for (let i = 1; i < lines.length; i++) {
+      const l = lines[i];
+      if (l.x < minLeft) minLeft = l.x;
+      if (l.x + l.w > maxRight) maxRight = l.x + l.w;
+      if (l.y < minTop) minTop = l.y;
+      if (l.y + l.h > maxBottom) maxBottom = l.y + l.h;
+    }
     nodes.push({
       id: nodes.length,
       parent: parentId,
       kind: 1,
       x: lines[0].x,
       y: lines[0].y,
-      w: Math.max(...lines.map((l) => l.x + l.w)) - Math.min(...lines.map((l) => l.x)),
-      h: Math.max(...lines.map((l) => l.y + l.h)) - Math.min(...lines.map((l) => l.y)),
+      w: maxRight - minLeft,
+      h: maxBottom - minTop,
       flags: F_FONT | (opacity !== undefined ? F_OPACITY : 0),
       font,
       overflowHidden: false,
