@@ -16,3 +16,5 @@ crate-type = ["cdylib", "rlib"]
 opt-level = "s"
 lto = true
 panic = "abort"
+codegen-units = 1
+strip = "symbols"
