@@ -30,40 +30,25 @@ function exports(): WasmExports {
   return instance.exports as unknown as WasmExports;
 }
 
-/** base64 -> Uint8Array（浏览器和 Node 都可用，不依赖 atob 之外 API）。 */
-export function decodeBase64(b64: string, len: number): Uint8Array {
-  // 浏览器有 atob；Node 在 16+ 也支持，作为兜底用 Buffer（类型用 any 规避 @types/node 依赖）。
-  let bin: string;
+/** base64 string -> Uint8Array (length inferred from decoded content, or capped by `len`). */
+export function base64ToBytes(b64: string, len?: number): Uint8Array {
   if (typeof atob === 'function') {
-    bin = atob(b64);
-  } else {
-    const g = globalThis as unknown as { Buffer?: { from(s: string, enc: string): { toString(enc: string): string } } };
-    bin = g.Buffer!.from(b64, 'base64').toString('binary');
+    const bin = atob(b64);
+    const n = len ?? bin.length;
+    const out = new Uint8Array(n);
+    for (let i = 0; i < n; i++) out[i] = bin.charCodeAt(i) & 0xff;
+    return out;
   }
-  const out = new Uint8Array(len);
-  for (let i = 0; i < len; i++) out[i] = bin.charCodeAt(i) & 0xff;
-  return out;
-}
-
-/** base64 string -> Uint8Array (length inferred from decoded content). */
-export function base64ToBytes(b64: string): Uint8Array {
-  let bin: string;
-  if (typeof atob === 'function') {
-    bin = atob(b64);
-  } else {
-    const g = globalThis as unknown as { Buffer?: { from(s: string, enc: string): Uint8Array } };
-    return g.Buffer!.from(b64, 'base64');
-  }
-  const out = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i) & 0xff;
-  return out;
+  const g = globalThis as unknown as { Buffer?: { from(s: string, enc: string): Uint8Array } };
+  const bytes = g.Buffer!.from(b64, 'base64');
+  return len !== undefined ? bytes.subarray(0, len) : bytes;
 }
 
 export function initWasm(): Promise<WebAssembly.Instance> {
   if (instance) return Promise.resolve(instance);
   if (!initPromise) {
     initPromise = (async () => {
-      const bytes = decodeBase64(WASM_BASE64, WASM_BYTE_LENGTH);
+      const bytes = base64ToBytes(WASM_BASE64, WASM_BYTE_LENGTH);
       // WebAssembly.instantiate(bytes, imports) 在浏览器/DOM lib 下返回
       // Promise<{ module, instance }>，但 WebWorker lib 下重载为 Promise<Instance>。
       // 用 WebAssembly.Module + WebAssembly.Instance 显式两步避免重载歧义。
