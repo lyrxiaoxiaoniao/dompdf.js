@@ -1,10 +1,36 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>dompdf.js Studio</title>
+  <title>dompdf.js Studio - 纯 JavaScript DOM-to-PDF 渲染引擎 | 在线演示</title>
+
+  <meta name="description"
+    content="dompdf.js 是一个纯 JavaScript DOM-to-PDF 渲染库，无需后端。在线演示支持 HTML/Markdown 编辑、实时 PDF 预览、中文完美支持。">
+  <meta name="keywords" content="dompdf.js, DOM to PDF, JavaScript PDF, 前端PDF生成, HTML转PDF, 在线PDF编辑器">
+  <link rel="canonical" href="https://dompdfjs.lisky.com.cn/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="dompdf.js Studio - 纯 JavaScript DOM-to-PDF 渲染引擎">
+  <meta property="og:description" content="纯前端 DOM-to-PDF 渲染引擎，支持 HTML/Markdown 编辑、实时 PDF 预览、中文完美支持">
+  <meta property="og:url" content="https://dompdfjs.lisky.com.cn/">
+  <meta property="og:site_name" content="dompdf.js Studio">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="dompdf.js Studio - 纯 JavaScript DOM-to-PDF 渲染引擎">
+  <meta name="twitter:description" content="纯前端 DOM-to-PDF 渲染引擎，支持 HTML/Markdown 编辑、实时 PDF 预览">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "dompdf.js",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Web",
+    "description": "纯 JavaScript DOM-to-PDF 渲染引擎",
+    "url": "https://dompdfjs.lisky.com.cn/"
+  }
+  </script>
+
+  <!-- 百度统计 -->
   <script>
     var _hmt = _hmt || [];
     (function () {
@@ -23,14 +49,14 @@
     rel="stylesheet">
 
   <!-- Vditor styles (for Markdown tab) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/vditor/dist/index.css" />
+  <link rel="stylesheet" href="./vendor/vditor/dist/index.css" />
   <link rel="stylesheet" href="./index.css" />
 
   <!-- Library Scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.2.7/dist/purify.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/marked@15.0.12/marked.min.js"></script>
+  <script src="./vendor/dompurify.min.js"></script>
+  <script src="./vendor/marked.min.js"></script>
   <script src="../dist/dompdf.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vditor/dist/index.min.js"></script>
+  <script src="./vendor/vditor/dist/index.min.js"></script>
 </head>
 
 <body>
@@ -95,12 +121,12 @@
           </div>
         </div>
 
-        <div class="sidebar-section">
+        <div class="sidebar-section" id="sidebar-benchmark-section">
           <div class="sidebar-section-title">生成页数</div>
           <div class="benchmark-control-group">
-            <div class="benchmark-mode-switch" role="tablist" aria-label="基准模式">
+            <div class="benchmark-mode-switch" role="tablist" aria-label="7页">
               <button class="benchmark-mode-btn active" id="benchmark-mode-light"
-                onclick="setBenchmarkMode('light')">12页</button>
+                onclick="setBenchmarkMode('light')">7页</button>
               <button class="benchmark-mode-btn" id="benchmark-mode-heavy"
                 onclick="setBenchmarkMode('heavy')">500页</button>
               <button class="benchmark-mode-btn" id="benchmark-mode-extreme"
@@ -111,7 +137,8 @@
                 <strong>dompdf 压缩</strong>
                 <span id="benchmark-compress-label">开启</span>
               </span>
-              <input type="checkbox" id="benchmark-compress-toggle" onchange="toggleBenchmarkCompress(this.checked)" checked />
+              <input type="checkbox" id="benchmark-compress-toggle" onchange="toggleBenchmarkCompress(this.checked)"
+                checked />
             </label>
             <div class="benchmark-meta" id="benchmark-meta">当前模式：12页 · 1 组短文本 · 压缩开启</div>
           </div>

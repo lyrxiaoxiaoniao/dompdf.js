@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿(function () {
+﻿﻿﻿(function () {
   /* ========================= Globals ========================= */
   var api = window.dompdf;
   var markedApi = window.marked;
@@ -25,6 +25,7 @@
   var benchmarkBuildPromise = Promise.resolve();
   var benchmarkBuildInProgress = false;
 
+  /* Font configs */
   var sharedFontConfig = {
     fontFamily: 'SourceHanSansSC-Regular',
     fontStyle: 'normal',
@@ -37,6 +38,7 @@
 
   /* Markdown editor */
   var vditor = null;
+  var vditorCdnBase = './vendor/vditor';
   var mdRenderTimer = 0;
   var activeTheme = 'paper';
   var themeLabels = {
@@ -109,6 +111,7 @@
   function setStatus(text, isError) {
     statusTextEl.textContent = text;
     statusDotEl.className = isError ? 'status-dot error' : 'status-dot success';
+    hideTopLoading();
   }
 
   function setStatusLoading(text) {
@@ -153,11 +156,19 @@
     document.getElementById('benchmark-mode-light').classList.toggle('active', benchmarkMode === 'light');
     document.getElementById('benchmark-mode-heavy').classList.toggle('active', benchmarkMode === 'heavy');
     document.getElementById('benchmark-mode-extreme').classList.toggle('active', benchmarkMode === 'extreme');
-    benchmarkMetaEl.textContent = (benchmarkMode === 'extreme')
+    if (benchmarkCompressToggleEl) benchmarkCompressToggleEl.checked = benchmarkCompressEnabled;
+    if (benchmarkCompressLabelEl) {
+      benchmarkCompressLabelEl.textContent = benchmarkCompressEnabled ? '开启' : '关闭';
+    }
+    if (benchmarkMetaEl) {
+      benchmarkMetaEl.textContent = benchmarkMode === 'light'
+        ? ('当前模式：轻量基准 ·1 组短文本' + (benchmarkCompressEnabled ? ' · 压缩开启' : ' · 压缩关闭'))
+        : benchmarkMode === 'extreme'
           ? (benchmarkBuildInProgress
             ? '当前模式：10000页测试 · 正在生成 8940 组超长文本'
             : '当前模式：10000页测试 · 8940 组超长文本') + (benchmarkCompressEnabled ? ' · 压缩开启' : ' · 压缩关闭')
           : ('当前模式：重压测 · 440 组超长文本' + (benchmarkCompressEnabled ? ' · 压缩开启' : ' · 压缩关闭'));
+    }
   }
 
   function rebuildBenchmarkSample() {
@@ -192,13 +203,58 @@
     return benchmarkBuildPromise;
   }
 
+  function ensureDemoReady() {
+    return readyPromise.then(function () {
+      if (!sharedFontConfig.fontBytes) {
+        throw new Error('中文字体尚未加载完成，请稍后重试');
+      }
+    });
+  }
+
   /* ========================= Tab Switching ========================= */
+  // Markdown 编辑器依赖 CDN 资源(Vditor / marked / DOMPurify)，判断是否都已就绪
+  function markdownDepsReady() {
+    return !!(window.Vditor && window.marked && window.DOMPurify);
+  }
+
+  // 轻量提示条(侧栏状态条被隐藏，改用居中 toast 反馈)
+  var miniToastTimer = null;
+  function showMiniToast(text) {
+    var el = document.getElementById('mini-toast');
+    if (!el) {
+      el = document.createElement('div');
+      el.id = 'mini-toast';
+      el.className = 'mini-toast';
+      document.body.appendChild(el);
+    }
+    el.textContent = text;
+    // 强制回流后再加类，保证过渡动画生效
+    void el.offsetWidth;
+    el.classList.add('is-visible');
+    if (miniToastTimer) clearTimeout(miniToastTimer);
+    miniToastTimer = setTimeout(function () {
+      el.classList.remove('is-visible');
+    }, 2600);
+  }
+
   window.switchTab = function (tab) {
+    // Markdown 资源未加载完成时不跳转，给出提示
+    if (tab === 'markdown' && !markdownDepsReady()) {
+      showMiniToast('Markdown 编辑器资源尚未加载完成，请稍候…');
+      return;
+    }
+
     activeTab = tab;
     document.getElementById('tab-btn-basic').classList.toggle('active', tab === 'basic');
     document.getElementById('tab-btn-markdown').classList.toggle('active', tab === 'markdown');
     document.getElementById('panel-basic').classList.toggle('active', tab === 'basic');
     document.getElementById('panel-markdown').classList.toggle('active', tab === 'markdown');
+
+    // "生成页数" 基准控制仅对综合测试页有意义，Markdown 编辑器下隐藏
+    var benchSection = document.getElementById('sidebar-benchmark-section');
+    if (benchSection) {
+      benchSection.style.display = tab === 'basic' ? '' : 'none';
+    }
 
     if (tab === 'markdown' && !vditor) {
       initMarkdownEditor();
@@ -627,6 +683,21 @@
   }
 
   /* ========================= Busy State ========================= */
+  // PDF 生成/对比按钮：字体就绪前禁用，避免在字体未加载时触发导出
+  var EXPORT_BTN_IDS = ['btn-export-dompdf', 'btn-export-html2pdf', 'btn-compare'];
+  function setExportButtonsEnabled(enabled) {
+    for (var i = 0; i < EXPORT_BTN_IDS.length; i++) {
+      var btn = document.getElementById(EXPORT_BTN_IDS[i]);
+      if (!btn) continue;
+      btn.disabled = !enabled;
+      if (enabled) {
+        btn.removeAttribute('title');
+      } else {
+        btn.title = '中文字体加载中，请稍候…';
+      }
+    }
+  }
+
   function withBusy(fn) {
     var btns = document.querySelectorAll('.action-btn');
     for (var i = 0; i < btns.length; i++) btns[i].disabled = true;
@@ -640,7 +711,8 @@
     withBusy(function () {
       setStatusLoading('运行 dompdf.js...');
       var target = null;
-      return ensureBenchmarkSampleReady()
+      return ensureDemoReady()
+        .then(function () { return ensureBenchmarkSampleReady(); })
         .then(function () {
           setStatusLoading('运行 dompdf.js...');
           target = getExportTarget();
@@ -652,7 +724,8 @@
           setStatus('dompdf.js 导出完成 · ' + formatDuration(result.durationMs) + ' · ' + formatBytes(result.sizeBytes));
         })
         .catch(function (err) {
-      return ensureBenchmarkSampleReady()
+          setStatus('error: ' + err.message, true);
+          console.error(err);
         })
         .finally(function () { if (target) cleanupTarget(target); });
     });
@@ -662,7 +735,8 @@
     withBusy(function () {
       setStatusLoading('运行 html2pdf.js...');
       var target = null;
-      return ensureBenchmarkSampleReady()
+      return ensureDemoReady()
+        .then(function () { return ensureBenchmarkSampleReady(); })
         .then(function () {
           setStatusLoading('运行 html2pdf.js...');
           target = getHtml2PdfTarget();
@@ -674,7 +748,8 @@
           setStatus(
             'html2pdf.js 导出完成 · ' +
             formatDuration(result.durationMs) + ' · ' +
-            formatBytes(result.sizeBytes)
+            formatBytes(result.sizeBytes) +
+            (result.blankPdfSuspected ? ' · 疑似空白PDF' : '')
           );
         })
         .catch(function (err) {
@@ -686,7 +761,6 @@
           else if (target) cleanupTarget(target);
         });
     });
-
   };
 
   window.runCompare = function () {
@@ -695,7 +769,8 @@
       setStatusLoading('正在对比 dompdf.js...');
       var target = null;
       var htmlTarget = null;
-      return ensureBenchmarkSampleReady()
+      return ensureDemoReady()
+        .then(function () { return ensureBenchmarkSampleReady(); })
         .then(function () {
           setStatusLoading('正在对比 dompdf.js...');
           target = getExportTarget();
@@ -710,6 +785,7 @@
           htmlTarget = getHtml2PdfTarget();
           return measureEngine('html2pdf', function () { return renderWithHtml2Pdf(htmlTarget); })
             .then(function () {
+              updateMetricsUI('html2pdf');
               setStatus(
                 generatedBlobs.html2pdf && generatedBlobs.html2pdf.blankPdfSuspected
                   ? '对比完成 · html2pdf.js 疑似空白PDF'
@@ -957,10 +1033,20 @@
     markedApi.setOptions({ gfm: true, breaks: true });
 
     vditor = new Vditor('vditor-container', {
+      cdn: vditorCdnBase,
       mode: 'ir',
       height: '100%',
       placeholder: '在此开始输入 Markdown 内容...',
       cache: { enable: false },
+      preview: {
+        theme: {
+          current: 'light',
+          path: vditorCdnBase + '/dist/css/content-theme'
+        }
+      },
+      hint: {
+        emojiPath: vditorCdnBase + '/dist/images/emoji'
+      },
       theme: 'classic',
       resize: { enable: false },
       toolbar: [
@@ -972,8 +1058,20 @@
       input: function () { scheduleMdRender(); },
       after: function () {
         vditor.setValue(mdSamples.default);
+        renderMarkdownNow();
       }
     });
+  }
+
+  function renderMarkdownNow() {
+    if (!vditor) return;
+    var markdown = vditor.getValue();
+    var html = markdown.trim() ? markedApi.parse(markdown) : '';
+    var previewEl = document.getElementById('markdown-preview');
+    var sheetEl = document.getElementById('preview-sheet');
+    previewEl.innerHTML = purifier.sanitize(html, { USE_PROFILES: { html: true } });
+    sheetEl.classList.toggle('is-empty', !markdown.trim());
+    updateMdStats(markdown);
   }
 
   function scheduleMdRender() {
@@ -1051,6 +1149,8 @@
     return;
   }
 
+  setStatusLoading('正在加载字体与编辑器资源...');
+  setExportButtonsEnabled(false); // 字体就绪前禁用导出/对比按钮
   updateBenchmarkUi();
   buildRecordsTable();
   buildLongList();
@@ -1071,9 +1171,12 @@
       setStatus('字体加载警告: ' + err.message, true);
     })
     .finally(function () {
+      // 字体字节就绪才放开导出按钮；失败则保持禁用
+      setExportButtonsEnabled(!!sharedFontConfig.fontBytes);
       readyResolve({
         status: statusTextEl.textContent,
         hasFontBytes: !!sharedFontConfig.fontBytes
       });
     });
 })();
+
