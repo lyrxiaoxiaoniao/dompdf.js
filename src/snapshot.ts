@@ -634,90 +634,10 @@ function parseColor(str: string | null | undefined): [number, number, number, nu
       result = parseColorViaCanvas(str);
     }
   } else {
-    // Try oklch() first (browser-independent), then fall back to canvas.
-    result = tryParseOklch(str) ?? parseColorViaCanvas(str);
+    result = parseColorViaCanvas(str);
   }
   colorCache.set(str, result);
   return result;
-}
-
-/** Parse oklch() color without browser dependency. Returns null if not oklch. */
-function tryParseOklch(str: string): [number, number, number, number] | null {
-  const m = /^oklch\(\s*([^)]+)\s*\)$/i.exec(str);
-  if (!m) return null;
-  const slashIdx = m[1].indexOf('/');
-  const mainPart = (slashIdx >= 0 ? m[1].slice(0, slashIdx) : m[1]).trim();
-  const alphaPart = slashIdx >= 0 ? m[1].slice(slashIdx + 1).trim() : null;
-  const parts = mainPart.split(/\s+/);
-  if (parts.length < 3) return null;
-
-  // L: 0-1 or 0%-100% (100% = 1.0)
-  let l = parseOklchNumber(parts[0], 1.0);
-  // C: 0+ or 0%-100% (100% = 0.4)
-  let c = parseOklchNumber(parts[1], 0.4);
-  // H: 0-360 (deg/rad/turn/grad, unitless = deg)
-  let h = parseOklchHue(parts[2]);
-  if (l === null || c === null || h === null) return null;
-  l = Math.max(0, Math.min(1, l));
-  c = Math.max(0, c);
-
-  // Alpha
-  let a = 1;
-  if (alphaPart !== null && alphaPart !== '') {
-    const aParsed = parseOklchNumber(alphaPart, 1.0);
-    a = aParsed === null ? 1 : aParsed;
-    a = Math.max(0, Math.min(1, a));
-  }
-
-  // oklch -> oklab
-  const hRad = h * Math.PI / 180;
-  const aLab = c * Math.cos(hRad);
-  const bLab = c * Math.sin(hRad);
-
-  // oklab -> linear sRGB (Björn Ottosson's matrix)
-  const l_ = l + 0.3963377774 * aLab + 0.2158037573 * bLab;
-  const m_ = l - 0.1055613458 * aLab - 0.0638541728 * bLab;
-  const s_ = l - 0.0894841775 * aLab - 1.2914855480 * bLab;
-  const l3 = l_ * l_ * l_;
-  const m3 = m_ * m_ * m_;
-  const s3 = s_ * s_ * s_;
-  let r = +4.0767416621 * l3 - 3.3077115913 * m3 + 0.2309699292 * s3;
-  let g = -1.2684380046 * l3 + 2.6097574011 * m3 - 0.3413193965 * s3;
-  let b = -0.0041960863 * l3 - 0.7034186147 * m3 + 1.7076147010 * s3;
-
-  // linear sRGB -> sRGB (gamma encoding)
-  r = linearToSrgb(r);
-  g = linearToSrgb(g);
-  b = linearToSrgb(b);
-
-  return [
-    Math.max(0, Math.min(1, r)),
-    Math.max(0, Math.min(1, g)),
-    Math.max(0, Math.min(1, b)),
-    a,
-  ];
-}
-
-function parseOklchNumber(s: string, percentScale: number): number | null {
-  if (s === 'none') return 0;
-  if (s.endsWith('%')) return (parseFloat(s) / 100) * percentScale;
-  const v = parseFloat(s);
-  return isNaN(v) ? null : v;
-}
-
-function parseOklchHue(s: string): number | null {
-  if (s === 'none') return 0;
-  if (s.endsWith('deg')) return parseFloat(s);
-  if (s.endsWith('rad')) return parseFloat(s) * 180 / Math.PI;
-  if (s.endsWith('turn')) return parseFloat(s) * 360;
-  if (s.endsWith('grad')) return parseFloat(s) * 0.9;
-  const v = parseFloat(s);
-  return isNaN(v) ? null : v;
-}
-
-function linearToSrgb(c: number): number {
-  if (c <= 0.0031308) return 12.92 * c;
-  return 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
 }
 
 function parseColorViaCanvas(str: string): [number, number, number, number] {
