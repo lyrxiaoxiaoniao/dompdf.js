@@ -892,6 +892,21 @@ function pxNumber(value: string | null | undefined): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+// Cached canvas used by measureTextWidth. Reused across calls to avoid
+// allocating a new <canvas> per marker measurement.
+let _measureCanvas: HTMLCanvasElement | null = null;
+
+// Measure a text run's width in CSS pixels using the given CSS font shorthand
+// (e.g. "700 16px Arial"). Falls back to 0 when Canvas2D is unavailable.
+function measureTextWidth(text: string, fontShorthand: string): number {
+  if (!text) return 0;
+  if (!_measureCanvas) _measureCanvas = document.createElement('canvas');
+  const ctx = _measureCanvas.getContext('2d');
+  if (!ctx) return 0;
+  ctx.font = fontShorthand;
+  return ctx.measureText(text).width;
+}
+
 function cssQuotedContentToText(content: string): string | null {
   const trimmed = (content || '').trim();
   if (!trimmed || trimmed === 'none' || trimmed === 'normal') return null;
@@ -908,6 +923,97 @@ function cssQuotedContentToText(content: string): string | null {
     return body;
   }
   return trimmed;
+}
+
+// Convert a 1-based index to alphabetic (a, b, ..., z, aa, ab, ...).
+function decimalToAlpha(n: number, upper: boolean): string {
+  if (n < 1) return String(n);
+  let s = '';
+  let v = n;
+  while (v > 0) {
+    v--;
+    s = String.fromCharCode(97 + (v % 26)) + s;
+    v = Math.floor(v / 26);
+  }
+  return upper ? s.toUpperCase() : s;
+}
+
+// Convert a 1-based index to Roman numerals (i, ii, iii, iv, ...).
+function decimalToRoman(n: number, upper: boolean): string {
+  if (n < 1) return String(n);
+  const table: Array<[number, string]> = [
+    [1000, 'M'], [900, 'CM'], [500, 'D'], [400, 'CD'],
+    [100, 'C'], [90, 'XC'], [50, 'L'], [40, 'XL'],
+    [10, 'X'], [9, 'IX'], [5, 'V'], [4, 'IV'], [1, 'I'],
+  ];
+  let s = '';
+  let v = n;
+  for (const [val, sym] of table) {
+    while (v >= val) {
+      s += sym;
+      v -= val;
+    }
+  }
+  return upper ? s : s.toLowerCase();
+}
+
+// Resolve ::marker text. Priority: explicit `content` string > list-style-type.
+// Returns null when the marker should not render (list-style-type: none or
+// content: none). `index` is 1-based and only used for counter-based styles.
+function markerTextFromListStyle(
+  listStyleType: string,
+  contentValue: string,
+  index: number,
+): string | null {
+  // Explicit `content: "..."` wins over list-style-type.
+  const quoted = cssQuotedContentToText(contentValue);
+  if (quoted !== null) return quoted;
+  const t = (listStyleType || 'disc').trim().toLowerCase();
+  if (t === 'none') return null;
+  switch (t) {
+    case 'disc': return '\u2022';
+    case 'circle': return '\u25E6';
+    case 'square': return '\u25AA';
+    case 'decimal': return `${index}.`;
+    case 'decimal-leading-zero': return `${String(index).padStart(2, '0')}.`;
+    case 'lower-alpha':
+    case 'lower-latin': return `${decimalToAlpha(index, false)}.`;
+    case 'upper-alpha':
+    case 'upper-latin': return `${decimalToAlpha(index, true)}.`;
+    case 'lower-roman': return `${decimalToRoman(index, false)}.`;
+    case 'upper-roman': return `${decimalToRoman(index, true)}.`;
+    default: return '\u2022';
+  }
+}
+
+// Compute the 1-based index of an <li> among its sibling <li>s, honoring
+// <ol start> and per-item <li value> overrides. Returns null when the element
+// is not a direct child of an <ol>/<ul>.
+function computeListItemIndex(li: HTMLElement): number | null {
+  const parent = li.parentElement;
+  if (!parent) return null;
+  const tag = parent.tagName.toUpperCase();
+  if (tag !== 'OL' && tag !== 'UL') return null;
+  let idx = 1;
+  if (tag === 'OL') {
+    const startAttr = parent.getAttribute('start');
+    if (startAttr !== null) {
+      const s = parseInt(startAttr, 10);
+      idx = isNaN(s) ? 1 : Math.max(1, s);
+    }
+  }
+  for (let child = parent.firstElementChild; child; child = child.nextElementSibling) {
+    if (child === li) return idx;
+    if (child.tagName.toUpperCase() === 'LI') {
+      const valueAttr = child.getAttribute('value');
+      if (valueAttr !== null) {
+        const v = parseInt(valueAttr, 10);
+        if (!isNaN(v)) idx = v;
+      }
+      idx++;
+    }
+  }
+  return null;
 }
 
 function hasVisibleBorder(cs: CSSStyleDeclaration): boolean {
@@ -2658,6 +2764,68 @@ function buildInlineRunsWithLangFont(
           objectFit: 0,
         };
         nodes.push(bgImageNode);
+      }
+    }
+
+    // --- ::marker synthesis for <li> ---
+    // When a <li> is rendered as vector / background-raster, its ::marker box
+    // is NOT a real DOM child (browsers paint it from list-style semantics), so
+    // the text-collector below would skip it. We synthesize a marker text node
+    // here so bullets/numbers survive into the PDF. full-raster is handled by
+    // cloneElementForRaster, which lets the browser paint the marker natively.
+    if (
+      strategy !== 'full-raster'
+      && el.tagName.toUpperCase() === 'LI'
+      && (cs.display || '').trim() === 'list-item'
+    ) {
+      const markerCs = getComputedStyle(el, '::marker');
+      const listStyleType = (cs.listStyleType || markerCs.listStyleType || 'disc').trim();
+      const idx = computeListItemIndex(el);
+      if (idx !== null) {
+        const markerText = markerTextFromListStyle(listStyleType, markerCs.content, idx);
+        if (markerText) {
+          const markerFont = makeFont(markerCs) as NonNullable<NodeRec['font']>;
+          const fontStr = `${markerCs.fontWeight} ${markerCs.fontSize} ${markerCs.fontFamily}`;
+          const textWidthPx = measureTextWidth(markerText, fontStr);
+          const fontSizePx = parseFloat(markerCs.fontSize) || parseFloat(cs.fontSize) || 16;
+          const lineHeightRaw = parseFloat(markerCs.lineHeight);
+          const lineHeightPx = isNaN(lineHeightRaw) ? fontSizePx * 1.2 : lineHeightRaw;
+
+          const liDoc = docRect(el.getBoundingClientRect());
+          const position = (cs.listStylePosition || 'outside').trim();
+          const paddingLeftPx = parseFloat(cs.paddingLeft) || 0;
+          const markerMarginLeftPx = parseFloat(markerCs.marginLeft) || 0;
+          const markerMarginRightPx = parseFloat(markerCs.marginRight) || 0;
+
+          // Vertical: align marker cap with the first text line of the <li>.
+          // Using liDoc.y + (lineHeight - fontSize)/2 approximates the text
+          // top for the common single-line case; multi-line <li> still get a
+          // correct first-line marker because lineHeight matches the first
+          // line box height.
+          const markerY = liDoc.y + (lineHeightPx - fontSizePx) * 0.5 * layoutScale;
+          let markerX: number;
+          if (position === 'inside') {
+            // Marker flows as the first inline child, so it starts at the
+            // padding-left edge of the <li>.
+            markerX = liDoc.x + paddingLeftPx * layoutScale;
+          } else {
+            // Outside: marker sits in the margin to the left of the <li>'s
+            // padding box. marker_right = padding_left - marginRight,
+            // marker_left  = marker_right - textWidth - marginLeft.
+            markerX = liDoc.x
+              + (paddingLeftPx - markerMarginRightPx - markerMarginLeftPx) * layoutScale
+              - textWidthPx * layoutScale;
+          }
+          const utf8End = utf8Offsets(markerText)[markerText.length];
+          pushTextNode(id, markerFont, markerText, [{
+            x: markerX,
+            y: markerY,
+            w: Math.max(1, textWidthPx * layoutScale),
+            h: Math.max(1, fontSizePx * layoutScale),
+            start: 0,
+            end: utf8End,
+          }]);
+        }
       }
     }
 
