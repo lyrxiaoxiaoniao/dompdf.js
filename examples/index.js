@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿(function () {
+﻿﻿﻿(function () {
   /* ========================= Globals ========================= */
   var api = window.dompdf;
   var markedApi = window.marked;
@@ -25,6 +25,7 @@
   var benchmarkBuildPromise = Promise.resolve();
   var benchmarkBuildInProgress = false;
 
+  /* Font configs */
   var sharedFontConfig = {
     fontFamily: 'SourceHanSansSC-Regular',
     fontStyle: 'normal',
@@ -37,6 +38,7 @@
 
   /* Markdown editor */
   var vditor = null;
+  var vditorCdnBase = './vendor/vditor';
   var mdRenderTimer = 0;
   var activeTheme = 'paper';
   var themeLabels = {
@@ -109,6 +111,7 @@
   function setStatus(text, isError) {
     statusTextEl.textContent = text;
     statusDotEl.className = isError ? 'status-dot error' : 'status-dot success';
+    hideTopLoading();
   }
 
   function setStatusLoading(text) {
@@ -153,11 +156,19 @@
     document.getElementById('benchmark-mode-light').classList.toggle('active', benchmarkMode === 'light');
     document.getElementById('benchmark-mode-heavy').classList.toggle('active', benchmarkMode === 'heavy');
     document.getElementById('benchmark-mode-extreme').classList.toggle('active', benchmarkMode === 'extreme');
-    benchmarkMetaEl.textContent = (benchmarkMode === 'extreme')
+    if (benchmarkCompressToggleEl) benchmarkCompressToggleEl.checked = benchmarkCompressEnabled;
+    if (benchmarkCompressLabelEl) {
+      benchmarkCompressLabelEl.textContent = benchmarkCompressEnabled ? '开启' : '关闭';
+    }
+    if (benchmarkMetaEl) {
+      benchmarkMetaEl.textContent = benchmarkMode === 'light'
+        ? ('当前模式：轻量基准 ·1 组短文本' + (benchmarkCompressEnabled ? ' · 压缩开启' : ' · 压缩关闭'))
+        : benchmarkMode === 'extreme'
           ? (benchmarkBuildInProgress
             ? '当前模式：10000页测试 · 正在生成 8940 组超长文本'
             : '当前模式：10000页测试 · 8940 组超长文本') + (benchmarkCompressEnabled ? ' · 压缩开启' : ' · 压缩关闭')
           : ('当前模式：重压测 · 440 组超长文本' + (benchmarkCompressEnabled ? ' · 压缩开启' : ' · 压缩关闭'));
+    }
   }
 
   function rebuildBenchmarkSample() {
@@ -713,7 +724,8 @@
           setStatus('dompdf.js 导出完成 · ' + formatDuration(result.durationMs) + ' · ' + formatBytes(result.sizeBytes));
         })
         .catch(function (err) {
-      return ensureBenchmarkSampleReady()
+          setStatus('error: ' + err.message, true);
+          console.error(err);
         })
         .finally(function () { if (target) cleanupTarget(target); });
     });
@@ -736,7 +748,8 @@
           setStatus(
             'html2pdf.js 导出完成 · ' +
             formatDuration(result.durationMs) + ' · ' +
-            formatBytes(result.sizeBytes)
+            formatBytes(result.sizeBytes) +
+            (result.blankPdfSuspected ? ' · 疑似空白PDF' : '')
           );
         })
         .catch(function (err) {
@@ -748,7 +761,6 @@
           else if (target) cleanupTarget(target);
         });
     });
-
   };
 
   window.runCompare = function () {
@@ -773,6 +785,7 @@
           htmlTarget = getHtml2PdfTarget();
           return measureEngine('html2pdf', function () { return renderWithHtml2Pdf(htmlTarget); })
             .then(function () {
+              updateMetricsUI('html2pdf');
               setStatus(
                 generatedBlobs.html2pdf && generatedBlobs.html2pdf.blankPdfSuspected
                   ? '对比完成 · html2pdf.js 疑似空白PDF'
@@ -1020,10 +1033,20 @@
     markedApi.setOptions({ gfm: true, breaks: true });
 
     vditor = new Vditor('vditor-container', {
+      cdn: vditorCdnBase,
       mode: 'ir',
       height: '100%',
       placeholder: '在此开始输入 Markdown 内容...',
       cache: { enable: false },
+      preview: {
+        theme: {
+          current: 'light',
+          path: vditorCdnBase + '/dist/css/content-theme'
+        }
+      },
+      hint: {
+        emojiPath: vditorCdnBase + '/dist/images/emoji'
+      },
       theme: 'classic',
       resize: { enable: false },
       toolbar: [
@@ -1035,8 +1058,20 @@
       input: function () { scheduleMdRender(); },
       after: function () {
         vditor.setValue(mdSamples.default);
+        renderMarkdownNow();
       }
     });
+  }
+
+  function renderMarkdownNow() {
+    if (!vditor) return;
+    var markdown = vditor.getValue();
+    var html = markdown.trim() ? markedApi.parse(markdown) : '';
+    var previewEl = document.getElementById('markdown-preview');
+    var sheetEl = document.getElementById('preview-sheet');
+    previewEl.innerHTML = purifier.sanitize(html, { USE_PROFILES: { html: true } });
+    sheetEl.classList.toggle('is-empty', !markdown.trim());
+    updateMdStats(markdown);
   }
 
   function scheduleMdRender() {
@@ -1144,3 +1179,4 @@
       });
     });
 })();
+
