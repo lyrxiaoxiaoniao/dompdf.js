@@ -1111,8 +1111,30 @@ fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
             out.push_str(&format!("{} {} {} {} re f\n", f(rx), f(ry), f(rw), f(rh)));
             out.push_str("Q\n");
         };
-        // Per-side stroke. Each side carries its own color (and its own alpha,
-        // wrapped in its own ExtGState so rgba() borders stay translucent).
+        let fill_side_rect = |side: usize, bw_px: f32, col: &[f32; 4], out: &mut String| {
+            if bw_px <= 0.0 {
+                return;
+            }
+            let alpha = col[3];
+            if alpha <= 0.001 {
+                return;
+            }
+            let bw = bw_px * PX_TO_PT;
+            let (rx, ry, rw, rh) = match side {
+                0 => (x0, top_pt - bw, w, bw),
+                1 => (right - bw, bottom, bw, h),
+                2 => (x0, bottom, w, bw),
+                3 => (x0, bottom, bw, h),
+                _ => return,
+            };
+            out.push_str("q\n");
+            if alpha < 0.999 {
+                out.push_str(&format!("/{} gs\n", opacity_resource_name(opacity_key(alpha))));
+            }
+            out.push_str(&format!("{} {} {} rg\n", f(col[0]), f(col[1]), f(col[2])));
+            out.push_str(&format!("{} {} {} {} re f\n", f(rx), f(ry), f(rw), f(rh)));
+            out.push_str("Q\n");
+        };
         let stroke_side = |bw_px: f32, style: u8, col: &[f32; 4], path: &str, out: &mut String| {
             if bw_px <= 0.0 {
                 return;
@@ -1132,9 +1154,12 @@ fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
                 out.push_str("Q\n");
             }
         };
-        // top
-        if radii.is_some() && b.s[0] == BORDER_SOLID {
-            fill_side_with_clip(0, b.w[0], &b.c[0], out);
+        if b.s[0] == BORDER_SOLID {
+            if radii.is_some() {
+                fill_side_with_clip(0, b.w[0], &b.c[0], out);
+            } else {
+                fill_side_rect(0, b.w[0], &b.c[0], out);
+            }
         } else {
             stroke_side(
                 b.w[0], b.s[0], &b.c[0],
@@ -1142,9 +1167,12 @@ fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
                 out,
             );
         }
-        // right
-        if radii.is_some() && b.s[1] == BORDER_SOLID {
-            fill_side_with_clip(1, b.w[1], &b.c[1], out);
+        if b.s[1] == BORDER_SOLID {
+            if radii.is_some() {
+                fill_side_with_clip(1, b.w[1], &b.c[1], out);
+            } else {
+                fill_side_rect(1, b.w[1], &b.c[1], out);
+            }
         } else {
             stroke_side(
                 b.w[1], b.s[1], &b.c[1],
@@ -1152,9 +1180,12 @@ fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
                 out,
             );
         }
-        // bottom
-        if radii.is_some() && b.s[2] == BORDER_SOLID {
-            fill_side_with_clip(2, b.w[2], &b.c[2], out);
+        if b.s[2] == BORDER_SOLID {
+            if radii.is_some() {
+                fill_side_with_clip(2, b.w[2], &b.c[2], out);
+            } else {
+                fill_side_rect(2, b.w[2], &b.c[2], out);
+            }
         } else {
             stroke_side(
                 b.w[2], b.s[2], &b.c[2],
@@ -1162,9 +1193,12 @@ fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
                 out,
             );
         }
-        // left
-        if radii.is_some() && b.s[3] == BORDER_SOLID {
-            fill_side_with_clip(3, b.w[3], &b.c[3], out);
+        if b.s[3] == BORDER_SOLID {
+            if radii.is_some() {
+                fill_side_with_clip(3, b.w[3], &b.c[3], out);
+            } else {
+                fill_side_rect(3, b.w[3], &b.c[3], out);
+            }
         } else {
             stroke_side(
                 b.w[3], b.s[3], &b.c[3],
