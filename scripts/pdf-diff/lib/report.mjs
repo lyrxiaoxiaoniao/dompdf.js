@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { writeJson } from './fs-util.mjs';
+import { writeMarkdownReport } from './md-report.mjs';
 
 // Assemble a single-corpus report (Tier 0 artifacts + Tier 1 metrics +
 // Tier 2 discrepancies + Tier 3 categories).
@@ -105,4 +106,6 @@ function aggregateCategoryTotals(entries) {
 
 export function writeReport(outDir, report) {
   writeJson(resolve(outDir, 'report.json'), report);
+  writeMarkdownReport(outDir, report);
+  console.error(`[pdf-diff] Markdown 报告: ${resolve(outDir, 'report.md')}`);
 }
