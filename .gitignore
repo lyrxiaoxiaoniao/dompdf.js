@@ -47,3 +47,6 @@ diagnose-stderr.txt
 scripts/diagnose-*.pdf
 
 deploy/
+
+web
+.codex

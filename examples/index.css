@@ -2247,3 +2247,162 @@ body.dompdf-overlay #document * {
     transform: rotate(360deg);
   }
 }
+
+/* OKLCH Color Space & Pseudo-class Demos */
+.swatch-group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.swatch-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.swatch-color {
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  flex-shrink: 0;
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+}
+.swatch-color-1 {
+  background-color: oklch(0.62 0.25 15); /* Vibrant Rose */
+}
+.swatch-color-2 {
+  background-color: oklch(0.68 0.22 145); /* Vivid Mint */
+}
+.swatch-color-3 {
+  background-color: oklch(0.65 0.24 260); /* Deep Sky Blue */
+}
+.swatch-color-4 {
+  background-color: oklch(0.78 0.16 85); /* Warm Amber */
+}
+.swatch-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.swatch-info strong {
+  font-size: 13.5px;
+  color: #0f172a;
+}
+.swatch-info code {
+  font-size: 11px;
+  color: #64748b;
+  font-family: var(--font-mono);
+}
+.oklch-gradient-card {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 24px;
+  border-radius: 14px;
+  color: #ffffff;
+  background: linear-gradient(135deg, oklch(0.62 0.25 15), oklch(0.65 0.24 260));
+  min-height: 200px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 20px -2px rgba(109, 40, 217, 0.15);
+}
+.oklch-gradient-card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.15) 0%, transparent 60%);
+  pointer-events: none;
+}
+.oklch-gradient-title {
+  font-size: 20px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.15);
+}
+.oklch-gradient-code {
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 6px 10px;
+  border-radius: 6px;
+  backdrop-filter: blur(4px);
+  align-self: flex-start;
+  border: 1px solid rgba(255,255,255,0.15);
+}
+
+/* Pseudo Elements & Classes Demos */
+.pseudo-showcase {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.pseudo-card-info {
+  position: relative;
+  padding: 16px 20px;
+  background: #f0f7ff;
+  border-left: 4px solid #2563eb;
+  border-radius: 0 8px 8px 0;
+}
+.pseudo-card-info::before {
+  content: "💡 TECHNICAL NOTE";
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #1d4ed8;
+  margin-bottom: 6px;
+  letter-spacing: 0.05em;
+}
+.pseudo-card-warn {
+  position: relative;
+  padding: 16px 20px;
+  background: #fffbeb;
+  border-left: 4px solid #d97706;
+  border-radius: 0 8px 8px 0;
+}
+.pseudo-card-warn::before {
+  content: "⚠️ PERFORMANCE WARNING";
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: #b45309;
+  margin-bottom: 6px;
+  letter-spacing: 0.05em;
+}
+.pseudo-inline-quote {
+  font-style: italic;
+  color: #475569;
+  position: relative;
+  padding: 0 10px;
+}
+.pseudo-inline-quote::before {
+  content: "“";
+  font-size: 28px;
+  color: #cbd5e1;
+  position: absolute;
+  left: -4px;
+  top: -10px;
+  font-family: serif;
+}
+.pseudo-inline-quote::after {
+  content: "”";
+  font-size: 28px;
+  color: #cbd5e1;
+  position: absolute;
+  right: -4px;
+  bottom: -22px;
+  font-family: serif;
+}
+.fancy-link {
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 500;
+  position: relative;
+}
+.fancy-link::after {
+  content: " ↗";
+  font-size: 0.9em;
+  color: #94a3b8;
+  font-weight: 400;
+}

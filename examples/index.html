@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 
 <head>
@@ -122,7 +122,8 @@
                 <strong>dompdf 压缩</strong>
                 <span id="benchmark-compress-label">开启</span>
               </span>
-              <input type="checkbox" id="benchmark-compress-toggle" onchange="toggleBenchmarkCompress(this.checked)" checked />
+              <input type="checkbox" id="benchmark-compress-toggle" onchange="toggleBenchmarkCompress(this.checked)"
+                checked />
             </label>
             <div class="benchmark-meta" id="benchmark-meta">当前模式：12页 · 1 组短文本 · 压缩开启</div>
           </div>
@@ -364,6 +365,130 @@
               <div class="report-section-head">
                 <div class="report-section-index">02</div>
                 <div>
+                  <div class="report-section-kicker">Colors</div>
+                  <h2>OKLCH 现代色彩空间支持</h2>
+                  <p class="report-section-summary">
+                    这一节展示 dompdf.js 如何完美支持 CSS Color Level 4 中的 <code>oklch()</code> 颜色函数，在 PDF 中还原更符合人眼感知的现代柔和色彩与高饱和渐变。
+                  </p>
+                </div>
+              </div>
+              <div class="report-grid report-grid-2">
+                <section class="report-card">
+                  <h3>OKLCH 配色面板</h3>
+                  <div class="swatch-group">
+                    <div class="swatch-item">
+                      <div class="swatch-color swatch-color-1"></div>
+                      <div class="swatch-info">
+                        <strong>Vibrant Rose (高饱和玫瑰红)</strong>
+                        <code>oklch(0.62 0.25 15)</code>
+                      </div>
+                    </div>
+                    <div class="swatch-item">
+                      <div class="swatch-color swatch-color-2"></div>
+                      <div class="swatch-info">
+                        <strong>Vivid Mint (薄荷嫩绿)</strong>
+                        <code>oklch(0.68 0.22 145)</code>
+                      </div>
+                    </div>
+                    <div class="swatch-item">
+                      <div class="swatch-color swatch-color-3"></div>
+                      <div class="swatch-info">
+                        <strong>Deep Sky Blue (天空深蓝)</strong>
+                        <code>oklch(0.65 0.24 260)</code>
+                      </div>
+                    </div>
+                    <div class="swatch-item">
+                      <div class="swatch-color swatch-color-4"></div>
+                      <div class="swatch-info">
+                        <strong>Warm Amber (琥珀暖黄)</strong>
+                        <code>oklch(0.78 0.16 85)</code>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+                <section class="report-card" style="display: flex; flex-direction: column; gap: 16px;">
+                  <h3>OKLCH 渐变卡片</h3>
+                  <div class="oklch-gradient-card">
+                    <div class="oklch-gradient-title">极光色彩流</div>
+                    <div class="oklch-gradient-code">linear-gradient(135deg, oklch(0.62 0.25 15), oklch(0.65 0.24 260))
+                    </div>
+                  </div>
+                  <div class="report-note cn-copy" style="margin-top: 0;">
+                    <strong>无损取色机制：</strong> 引擎并非手写正则解析复杂的 <code>oklch()</code> 函数，而是巧妙地通过 Canvas 2D
+                    进行底层颜色的运行时序列化与标准化，因此能实现对任何先进 CSS 颜色空间函数的开箱即用完美兼容。
+                  </div>
+                </section>
+              </div>
+            </section>
+            <section class="report-section">
+              <div class="report-section-head">
+                <div class="report-section-index">03</div>
+                <div>
+                  <div class="report-section-kicker">Pseudo-classes</div>
+                  <h2>CSS 伪元素与矢量渲染能力</h2>
+                  <p class="report-section-summary cn-copy">
+                    演示 <code>::before</code> 与 <code>::after</code> 伪元素生成的文本与图标。在导出为 PDF 时，这些内容将完全保留为矢量文本，支持独立选择与检索。
+                  </p>
+                </div>
+              </div>
+              <div class="report-grid report-grid-2">
+                <section class="report-card pseudo-showcase">
+                  <h3>伪元素装饰性组件</h3>
+                  <div class="pseudo-card-info">
+                    <code>dompdf.js</code> 支持在 DOM 序列化时深入伪元素节点，将其转换为真实的虚拟节点并在 Rust WASM 端进行矢量文字和形状绘制。
+                  </div>
+                  <div class="pseudo-card-warn">
+                    过度使用 <code>::before</code>/<code>::after</code> 可能会轻微降低 DOM Walk 阶段的解析效率，但不会影响最终 PDF 体积。
+                  </div>
+                  <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e2e8f0;">
+                    <h4 style="font-size: 13px; color: #1e293b; margin-bottom: 8px; font-weight: 600;">列表伪元素标记
+                      (::marker)</h4>
+                    <div style="display: flex; gap: 20px;">
+                      <div style="flex: 1;">
+                        <span
+                          style="font-size: 11px; color: #64748b; display: block; margin-bottom: 4px; font-weight: 500;">无序列表
+                          (ul > li)</span>
+                        <ul style="margin: 0; padding-left: 18px; font-size: 12.5px; color: #334155; line-height: 1.6;">
+                          <li>无序列表项 A</li>
+                          <li>无序列表项 B</li>
+                        </ul>
+                      </div>
+                      <div style="flex: 1;">
+                        <span
+                          style="font-size: 11px; color: #64748b; display: block; margin-bottom: 4px; font-weight: 500;">有序列表
+                          (ol > li)</span>
+                        <ol style="margin: 0; padding-left: 18px; font-size: 12.5px; color: #334155; line-height: 1.6;">
+                          <li>顺序序列项 1</li>
+                          <li>顺序序列项 2</li>
+                        </ol>
+                      </div>
+                    </div>
+                  </div>
+                </section>
+                <section class="report-card" style="display: flex; flex-direction: column; gap: 24px;">
+                  <h3>行内伪元素文本与链接</h3>
+                  <p>
+                    在排版长文档时，常使用伪元素生成引言的标点：
+                    <span class="pseudo-inline-quote">这里是一段由 <code>::before</code> 与 <code>::after</code> 的 content
+                      属性渲染的假引言文本。</span>
+                  </p>
+                  <p style="margin-top: 10px;">
+                    或者在链接后添加指示箭头：
+                    了解更多关于 <a class="fancy-link" href="https://github.com/lmn1919/dompdf.js" target="_blank"
+                      rel="noreferrer">dompdf.js GitHub 仓库</a> 的技术实现细节。
+                  </p>
+                  <div class="report-note cn-copy">
+                    <strong>矢量化优势：</strong> 传统的基于截图的渲染引擎（如 html2pdf）将伪元素同页面一同转化为位图，而 dompdf.js 能够将其中的文字全部转化为 PDF 原生 Text
+                    算子，在导出的 PDF 中可以直接<strong>搜索“TECHNICAL NOTE”</strong>。
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <section class="report-section">
+              <div class="report-section-head">
+                <div class="report-section-index">04</div>
+                <div>
                   <div class="report-section-kicker">Graphics</div>
                   <h2>矢量图形与位图样本</h2>
                   <p class="report-section-summary">
@@ -448,7 +573,7 @@
 
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">03</div>
+                <div class="report-section-index">05</div>
                 <div>
                   <div class="report-section-kicker">Layout</div>
                   <h2>布局、裁切、透明度与流程图</h2>
@@ -457,7 +582,7 @@
                   </p>
                 </div>
               </div>
-              <div class="report-grid report-grid-2" >
+              <div class="report-grid report-grid-2">
                 <section class="report-card" divisionDisable>
                   <h3>渲染流程示意</h3>
                   <svg class="report-svg-figure" viewBox="0 0 640 250" aria-label="Pipeline diagram">
@@ -516,7 +641,7 @@
 
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">04</div>
+                <div class="report-section-index">06</div>
                 <div>
                   <div class="report-section-kicker">Structured Data</div>
                   <h2>结构化表格与文本检索</h2>
@@ -560,7 +685,7 @@
 
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">05</div>
+                <div class="report-section-index">07</div>
                 <div>
                   <div class="report-section-kicker">Reference Blocks</div>
                   <h2>定义列表、代码块与数学符号</h2>
@@ -580,7 +705,8 @@
                     <div>
                       <dt>Pagination</dt>
                       <dd>Assign lines and blocks to pages while respecting <code>pageBreak</code> and
-                        <code>divisionDisable</code>.</dd>
+                        <code>divisionDisable</code>.
+                      </dd>
                     </div>
                     <div>
                       <dt>Emission</dt>
@@ -620,85 +746,7 @@
 
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">06</div>
-                <div>
-                  <div class="report-section-kicker">Color</div>
-                  <h2>OKLCH 色彩空间测试</h2>
-                  <p class="report-section-summary cn-copy">
-                    以下色块、文字、边框和渐变全部使用 CSS oklch() 颜色函数定义，用于验证 dompdf.js 对现代 CSS 色彩空间的解析能力（库内独立转换，不依赖浏览器 canvas）。
-                  </p>
-                </div>
-              </div>
-
-              <div class="rich-grid">
-                <section class="rich-card">
-                  <h3>色相轮 (Hue Sweep)</h3>
-                  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 0);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 30);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 60);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 90);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 120);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 150);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 180);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 210);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 240);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 270);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 300);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.2 330);border-radius:4px"></div>
-                  </div>
-                </section>
-
-                <section class="rich-card">
-                  <h3>亮度与彩度</h3>
-                  <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
-                    <div style="width:48px;height:48px;background:oklch(0.3 0.1 250);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.45 0.1 250);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.6 0.1 250);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.75 0.1 250);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.9 0.1 250);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.05 250);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.15 250);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.25 250);border-radius:4px"></div>
-                    <div style="width:48px;height:48px;background:oklch(0.65 0.35 250);border-radius:4px"></div>
-                  </div>
-                </section>
-              </div>
-
-              <section class="rich-card" style="margin-top:12px">
-                <h3>文字与边框</h3>
-                <p style="color:oklch(0.55 0.2 25);font-size:16px;font-weight:600;margin:8px 0">oklch 暖红文字 (L=0.55 C=0.2 H=25)</p>
-                <p style="color:oklch(0.5 0.15 145);font-size:16px;font-weight:600;margin:8px 0">oklch 翠绿文字 (L=0.5 C=0.15 H=145)</p>
-                <p style="color:oklch(0.6 0.2 265);font-size:16px;font-weight:600;margin:8px 0">oklch 蓝紫文字 (L=0.6 C=0.2 H=265)</p>
-                <div style="border:3px solid oklch(0.6 0.2 90);padding:10px;margin-top:8px;border-radius:4px">
-                  <p style="margin:0">oklch 边框容器 (H=90 黄绿)</p>
-                </div>
-                <div style="border:3px solid oklch(0.5 0.2 350);padding:10px;margin-top:8px;border-radius:4px">
-                  <p style="margin:0">oklch 边框容器 (H=350 玫红)</p>
-                </div>
-              </section>
-
-              <section class="rich-card" style="margin-top:12px">
-                <h3>透明度与百分比语法</h3>
-                <div style="display:flex;gap:8px;margin-top:8px">
-                  <div style="flex:1;height:40px;background:oklch(0.6 0.2 200 / 1);border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">alpha 1</div>
-                  <div style="flex:1;height:40px;background:oklch(0.6 0.2 200 / 0.7);border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">alpha 0.7</div>
-                  <div style="flex:1;height:40px;background:oklch(0.6 0.2 200 / 0.4);border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px">alpha 0.4</div>
-                  <div style="flex:1;height:40px;background:oklch(0.6 0.2 200 / 0.15);border-radius:4px;display:flex;align-items:center;justify-content:center;color:#333;font-size:12px">alpha 0.15</div>
-                </div>
-                <p style="margin-top:10px">百分比语法：<span style="background:oklch(70% 20% 200);padding:2px 8px;border-radius:3px;color:#fff">oklch(70% 20% 200)</span></p>
-              </section>
-
-              <section class="rich-card" style="margin-top:12px">
-                <h3>OKLCH 渐变</h3>
-                <div style="height:40px;background:linear-gradient(90deg, oklch(0.6 0.25 0), oklch(0.6 0.25 90), oklch(0.6 0.25 180), oklch(0.6 0.25 270), oklch(0.6 0.25 360));border-radius:4px;margin-top:8px"></div>
-                <div style="height:40px;background:linear-gradient(90deg, oklch(0.4 0.1 280), oklch(0.7 0.2 280), oklch(0.9 0.05 280));border-radius:4px;margin-top:6px"></div>
-              </section>
-            </section>
-
-            <section class="report-section">
-              <div class="report-section-head">
-                <div class="report-section-index">07</div>
+                <div class="report-section-index">08</div>
                 <div>
                   <div class="report-section-kicker">Pagination</div>
                   <h2>分页压力测试与附录</h2>
