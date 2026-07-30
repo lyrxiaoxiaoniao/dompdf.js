@@ -153,6 +153,40 @@ body {
   margin-left: auto;
 }
 
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--sidebar-card-border);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.lang-switch-btn {
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sidebar-text-muted);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+
+.lang-switch-btn:hover {
+  color: var(--sidebar-text);
+}
+
+.lang-switch-btn.active {
+  background: var(--sidebar-accent);
+  color: #18181b;
+}
+
 .sidebar-status {
   display: flex;
   align-items: center;
@@ -627,6 +661,7 @@ body {
        ====================================================================== */
 .content-area {
   flex: 1;
+  min-width: 0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1025,6 +1060,8 @@ body {
   border-radius: 10px;
   background: #fbfcfd;
   padding: 20px 22px;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 .report-card h3,
@@ -1874,11 +1911,13 @@ body.dompdf-overlay #document * {
 .md-layout {
   display: flex;
   flex: 1;
+  min-width: 0;
   overflow: hidden;
 }
 
 .md-editor-panel {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   border-right: 1px solid var(--border-color);
@@ -1888,6 +1927,7 @@ body.dompdf-overlay #document * {
 
 .md-preview-panel {
   flex: 1.1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   background: var(--content-bg);
@@ -1906,6 +1946,7 @@ body.dompdf-overlay #document * {
 }
 
 .md-panel-title {
+  min-width: 0;
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
@@ -1921,6 +1962,7 @@ body.dompdf-overlay #document * {
 
 .md-panel-stats {
   display: flex;
+  min-width: 0;
   gap: 6px;
 }
 
