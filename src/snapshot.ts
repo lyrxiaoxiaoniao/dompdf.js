@@ -657,6 +657,17 @@ function parseColorViaCanvas(str: string): [number, number, number, number] {
     const p = m[1].split(',').map((s) => parseFloat(s));
     return [p[0] / 255, p[1] / 255, p[2] / 255, p[3] === undefined ? 1 : p[3]];
   }
+  // CSS Color 4 values such as oklch()/lab()/color(display-p3 ...)
+  // may survive in canvas.fillStyle as-is instead of normalizing to rgb(...).
+  // Sample a painted pixel to force the browser to resolve them.
+  try {
+    colorCtx!.clearRect(0, 0, 1, 1);
+    colorCtx!.fillRect(0, 0, 1, 1);
+    const data = colorCtx!.getImageData(0, 0, 1, 1).data;
+    return [data[0] / 255, data[1] / 255, data[2] / 255, data[3] / 255];
+  } catch {
+    // ignore and fall through
+  }
   return [0, 0, 0, 0];
 }
 
@@ -1036,6 +1047,11 @@ function pseudoHasVisual(cs: CSSStyleDeclaration): boolean {
   return hasContent || hasBg || hasBox || hasVisibleBorder(cs);
 }
 
+function pseudoNeedsForegroundRaster(cs: CSSStyleDeclaration): boolean {
+  const pseudoText = cssQuotedContentToText(cs.content);
+  return !!pseudoText && pseudoText.trim().length > 0;
+}
+
 function hasComplexBackground(cs: CSSStyleDeclaration): boolean {
   const bgImage = (cs.backgroundImage || '').trim();
   if (!bgImage || bgImage === 'none') return false;
@@ -1116,6 +1132,90 @@ function findOpaqueBackdropColor(el: HTMLElement): string {
     bAcc += 255 * alphaRem;
   }
   return `rgb(${Math.round(rAcc)}, ${Math.round(gAcc)}, ${Math.round(bAcc)})`;
+}
+
+function colorToCssRgb(color: [number, number, number, number]): string {
+  return `rgb(${Math.round(color[0] * 255)}, ${Math.round(color[1] * 255)}, ${Math.round(color[2] * 255)})`;
+}
+
+function hasComplexBackdropVisual(el: HTMLElement): boolean {
+  const cs = getComputedStyle(el);
+  if (hasComplexBackground(cs)) return true;
+  const before = getComputedStyle(el, '::before');
+  const after = getComputedStyle(el, '::after');
+  return pseudoHasVisual(before) || pseudoHasVisual(after);
+}
+
+function sampleRawRgbRegion(
+  bytes: Uint8Array,
+  width: number,
+  height: number,
+  rx: number,
+  ry: number,
+  rw: number,
+  rh: number,
+): [number, number, number, number] | null {
+  const x0 = Math.max(0, Math.min(width, Math.round(rx)));
+  const y0 = Math.max(0, Math.min(height, Math.round(ry)));
+  const x1 = Math.max(0, Math.min(width, Math.round(rx + rw)));
+  const y1 = Math.max(0, Math.min(height, Math.round(ry + rh)));
+  if (x1 <= x0 || y1 <= y0) return null;
+  const stepX = Math.max(1, Math.floor((x1 - x0) / 8));
+  const stepY = Math.max(1, Math.floor((y1 - y0) / 8));
+  const rs: number[] = [];
+  const gs: number[] = [];
+  const bs: number[] = [];
+  for (let y = y0; y < y1; y += stepY) {
+    for (let x = x0; x < x1; x += stepX) {
+      const idx = (y * width + x) * 3;
+      rs.push(bytes[idx]);
+      gs.push(bytes[idx + 1]);
+      bs.push(bytes[idx + 2]);
+    }
+  }
+  if (rs.length === 0) return null;
+  rs.sort((a, b) => a - b);
+  gs.sort((a, b) => a - b);
+  bs.sort((a, b) => a - b);
+  const mid = rs.length >> 1;
+  const pick = (arr: number[]) => (arr.length % 2 ? arr[mid] : (arr[mid - 1] + arr[mid]) / 2);
+  return [pick(rs) / 255, pick(gs) / 255, pick(bs) / 255, 1];
+}
+
+function cropRawRgbToDataUrl(
+  bytes: Uint8Array,
+  width: number,
+  height: number,
+  rx: number,
+  ry: number,
+  rw: number,
+  rh: number,
+): string | null {
+  const x0 = Math.max(0, Math.min(width, Math.round(rx)));
+  const y0 = Math.max(0, Math.min(height, Math.round(ry)));
+  const x1 = Math.max(0, Math.min(width, Math.round(rx + rw)));
+  const y1 = Math.max(0, Math.min(height, Math.round(ry + rh)));
+  const outW = x1 - x0;
+  const outH = y1 - y0;
+  if (outW <= 0 || outH <= 0) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = outW;
+  canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+  const imageData = ctx.createImageData(outW, outH);
+  for (let y = 0; y < outH; y++) {
+    for (let x = 0; x < outW; x++) {
+      const srcIdx = ((y + y0) * width + (x + x0)) * 3;
+      const dstIdx = (y * outW + x) * 4;
+      imageData.data[dstIdx] = bytes[srcIdx];
+      imageData.data[dstIdx + 1] = bytes[srcIdx + 1];
+      imageData.data[dstIdx + 2] = bytes[srcIdx + 2];
+      imageData.data[dstIdx + 3] = 255;
+    }
+  }
+  ctx.putImageData(imageData, 0, 0);
+  return canvas.toDataURL('image/png');
 }
 
 function copyComputedStyles(
@@ -1213,18 +1313,23 @@ function cloneElementForRaster(src: HTMLElement): HTMLElement {
   return clone;
 }
 
-// Clone only an element's own background layer: its computed styles + ::before
-// decoration, with NO real children/text and NO box-shadow. Used to bake a
-// backdrop image that sits under the element's still-vector text. box-shadow is
-// dropped because the box node paints it vectorially (avoids double shadow);
-// ::after is intentionally excluded (it paints above content — handled by the
-// classifier falling back to full-raster when ::after has visuals).
+// Clone only an element's own background layer: its computed styles + decorative
+// pseudos, with NO real children/text and NO box-shadow. Used to bake a backdrop
+// image that sits under the element's still-vector text. box-shadow is dropped
+// because the box node paints it vectorially (avoids double shadow). Purely
+// decorative ::after overlays (no text content) can also be baked here to avoid
+// unnecessary full-raster fallback for gradient cards / highlight sheens.
 function cloneElementBackgroundOnly(src: HTMLElement): HTMLElement {
   const clone = src.cloneNode(false) as HTMLElement;
   copyComputedStyles(clone, getComputedStyle(src));
   clone.style.boxShadow = 'none';
   const before = buildPseudoClone(src, '::before');
   if (before) clone.appendChild(before);
+  const afterComputed = getComputedStyle(src, '::after');
+  if (pseudoHasVisual(afterComputed) && !pseudoNeedsForegroundRaster(afterComputed)) {
+    const after = buildPseudoClone(src, '::after');
+    if (after) clone.appendChild(after);
+  }
   return clone;
 }
 
@@ -1287,13 +1392,21 @@ function buildRasterWrapper(
   captureWidth: number,
   captureHeight: number,
   backgroundOnly: boolean,
+  backdropCss?: string,
+  backdropImageUrl?: string,
 ): HTMLElement {
   const wrapper = document.createElement('div');
   wrapper.style.position = 'relative';
   wrapper.style.width = `${captureWidth}px`;
   wrapper.style.height = `${captureHeight}px`;
   wrapper.style.overflow = 'hidden';
-  wrapper.style.background = findOpaqueBackdropColor(el);
+  wrapper.style.background = backdropCss || findOpaqueBackdropColor(el);
+  if (backdropImageUrl) {
+    wrapper.style.backgroundImage = `url("${backdropImageUrl}")`;
+    wrapper.style.backgroundSize = '100% 100%';
+    wrapper.style.backgroundRepeat = 'no-repeat';
+    wrapper.style.backgroundPosition = '0 0';
+  }
 
   const clone = backgroundOnly ? cloneElementBackgroundOnly(el) : cloneElementForRaster(el);
   clone.style.position = 'absolute';
@@ -1308,6 +1421,60 @@ function buildRasterWrapper(
   return wrapper;
 }
 
+async function resolveBackdropImage(el: HTMLElement, rawRect: DOMRect): Promise<string | null> {
+  for (let cur: HTMLElement | null = el.parentElement; cur; cur = cur.parentElement) {
+    if (!hasComplexBackdropVisual(cur)) continue;
+    const ancestorRect = cur.getBoundingClientRect();
+    if (ancestorRect.width <= 0 || ancestorRect.height <= 0) continue;
+    const raster = await rasterizeElementBackgroundOnly(cur, ancestorRect, findOpaqueBackdropColor(cur));
+    if (!raster) continue;
+    const scaleX = raster.width / Math.max(1, Math.ceil(ancestorRect.width));
+    const scaleY = raster.height / Math.max(1, Math.ceil(ancestorRect.height));
+    const relX = Math.max(0, rawRect.left - ancestorRect.left);
+    const relY = Math.max(0, rawRect.top - ancestorRect.top);
+    const dataUrl = cropRawRgbToDataUrl(
+      raster.bytes,
+      raster.width,
+      raster.height,
+      relX * scaleX,
+      relY * scaleY,
+      Math.max(1, rawRect.width * scaleX),
+      Math.max(1, rawRect.height * scaleY),
+    );
+    if (dataUrl) return dataUrl;
+  }
+  return null;
+}
+
+async function resolveBackdropColor(
+  el: HTMLElement,
+  rawRect: DOMRect,
+): Promise<[number, number, number, number]> {
+  for (let cur: HTMLElement | null = el.parentElement; cur; cur = cur.parentElement) {
+    if (!hasComplexBackdropVisual(cur)) continue;
+    const ancestorRect = cur.getBoundingClientRect();
+    if (ancestorRect.width <= 0 || ancestorRect.height <= 0) continue;
+    const raster = await rasterizeElementBackgroundOnly(cur, ancestorRect, findOpaqueBackdropColor(cur));
+    if (!raster) continue;
+    const scaleX = raster.width / Math.max(1, Math.ceil(ancestorRect.width));
+    const scaleY = raster.height / Math.max(1, Math.ceil(ancestorRect.height));
+    const relX = Math.max(0, rawRect.left - ancestorRect.left);
+    const relY = Math.max(0, rawRect.top - ancestorRect.top);
+    const inset = 0.25;
+    const sample = sampleRawRgbRegion(
+      raster.bytes,
+      raster.width,
+      raster.height,
+      (relX + rawRect.width * inset) * scaleX,
+      (relY + rawRect.height * inset) * scaleY,
+      Math.max(1, rawRect.width * (1 - inset * 2) * scaleX),
+      Math.max(1, rawRect.height * (1 - inset * 2) * scaleY),
+    );
+    if (sample) return sample;
+  }
+  return parseColor(findOpaqueBackdropColor(el));
+}
+
 async function rasterizeElement(
   el: HTMLElement,
   rawRect: DOMRect,
@@ -1318,7 +1485,9 @@ async function rasterizeElement(
     const shadowPad = computeBoxShadowPadding(cs.boxShadow);
     const captureWidth = Math.max(1, Math.ceil(rawRect.width + shadowPad.left + shadowPad.right));
     const captureHeight = Math.max(1, Math.ceil(rawRect.height + shadowPad.top + shadowPad.bottom));
-    const wrapper = buildRasterWrapper(el, rawRect, shadowPad, captureWidth, captureHeight, false);
+    const backdropCss = colorToCssRgb(await resolveBackdropColor(el, rawRect));
+    const backdropImageUrl = await resolveBackdropImage(el, rawRect);
+    const wrapper = buildRasterWrapper(el, rawRect, shadowPad, captureWidth, captureHeight, false, backdropCss, backdropImageUrl ?? undefined);
     const out = await rasterizeWrapper(wrapper, captureWidth, captureHeight);
     if (!out) return null;
     return {
@@ -1342,13 +1511,16 @@ async function rasterizeElement(
 async function rasterizeElementBackgroundOnly(
   el: HTMLElement,
   rawRect: DOMRect,
+  backdropCss?: string,
 ): Promise<{ bytes: Uint8Array; width: number; height: number; format: number } | null> {
   try {
     // No shadow padding: box-shadow is painted vectorially by the box node.
     const captureWidth = Math.max(1, Math.ceil(rawRect.width));
     const captureHeight = Math.max(1, Math.ceil(rawRect.height));
     const noPad: EdgePadding = { top: 0, right: 0, bottom: 0, left: 0 };
-    const wrapper = buildRasterWrapper(el, rawRect, noPad, captureWidth, captureHeight, true);
+    const resolvedBackdrop = backdropCss || colorToCssRgb(await resolveBackdropColor(el, rawRect));
+    const backdropImageUrl = await resolveBackdropImage(el, rawRect);
+    const wrapper = buildRasterWrapper(el, rawRect, noPad, captureWidth, captureHeight, true, resolvedBackdrop, backdropImageUrl ?? undefined);
     return await rasterizeWrapper(wrapper, captureWidth, captureHeight);
   } catch {
     return null;
@@ -1407,6 +1579,22 @@ function classifyRenderStrategy(el: HTMLElement, cs: CSSStyleDeclaration): Rende
   const mode = el.dataset.dom2pdfMode;
   if (mode === 'vector' || mode === 'skip') return 'vector';
   if (isRasterTag(el)) return 'full-raster';
+  const backdropFilter = (cs.getPropertyValue('backdrop-filter') || cs.getPropertyValue('-webkit-backdrop-filter') || '').trim();
+  if (backdropFilter && backdropFilter !== 'none') return 'full-raster';
+  if (el.tagName === 'CODE') {
+    const bg = parseColor(cs.backgroundColor);
+    const hasRadius = (parseFloat(cs.borderTopLeftRadius) || 0)
+      + (parseFloat(cs.borderTopRightRadius) || 0)
+      + (parseFloat(cs.borderBottomRightRadius) || 0)
+      + (parseFloat(cs.borderBottomLeftRadius) || 0);
+    if (bg[3] > 0.001 || hasRadius > 0) {
+      // Inline code chips are tiny and visually sensitive to exact browser
+      // painting (background fill, corner clipping, font AA). Rasterizing the
+      // chip preserves that appearance while hidden text fallback keeps them
+      // extractable in the PDF text layer.
+      return 'full-raster';
+    }
+  }
   const clipsText = cs.backgroundImage !== 'none'
     && ((cs.backgroundClip || '').trim() === 'text'
       || (cs.webkitBackgroundClip || '').trim() === 'text');
@@ -1416,13 +1604,44 @@ function classifyRenderStrategy(el: HTMLElement, cs: CSSStyleDeclaration): Rende
   // Non-translate transforms skew/scale/rotate the text — must check before the
   // background branch so e.g. "rotate + gradient" doesn't try to keep text vector.
   if (!transformIsPureTranslate(cs)) return 'full-raster';
-  // ::after paints ABOVE content; a backdrop image is drawn BELOW the text, so an
-  // ::after overlay would end up hidden behind the text. Fall back to full-raster
-  // for those rather than mislayer them.
-  if (pseudoHasVisual(getComputedStyle(el, '::after'))) return 'full-raster';
+  const afterPseudo = getComputedStyle(el, '::after');
+  // Textual ::after content must stay in the foreground paint order, so keep the
+  // old full-raster fallback for those cases. Decorative overlays can be baked
+  // into the backdrop image while real text remains vector.
+  if (pseudoHasVisual(afterPseudo) && pseudoNeedsForegroundRaster(afterPseudo)) return 'full-raster';
   const beforeVisual = pseudoHasVisual(getComputedStyle(el, '::before'));
-  if (beforeVisual || hasComplexBackground(cs)) return 'background-raster';
+  if (beforeVisual || pseudoHasVisual(afterPseudo) || hasComplexBackground(cs)) return 'background-raster';
   return 'vector';
+}
+
+function collectFullRasterExtractableText(root: HTMLElement): string {
+  const parts: string[] = [];
+
+  const append = (value: string | null | undefined) => {
+    if (!value) return;
+    parts.push(value);
+  };
+
+  const walk = (node: Node): void => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      append((node as Text).data);
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    const el = node as HTMLElement;
+    append(cssQuotedContentToText(getComputedStyle(el, '::before').content));
+    for (let child = el.firstChild; child; child = child.nextSibling) {
+      walk(child);
+    }
+    append(cssQuotedContentToText(getComputedStyle(el, '::after').content));
+  };
+
+  walk(root);
+  return parts
+    .join('')
+    .replace(/\s*\n\s*/g, ' ')
+    .replace(/[ \t\f\r]+/g, ' ')
+    .trim();
 }
 
 function gradientAngleDeg(token: string): number | null {
@@ -2580,6 +2799,41 @@ function buildInlineRunsWithLangFont(
           imageId,
           objectFit: 0,
         });
+
+        if (el.tagName === 'CODE') {
+          const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+          let textNode = walker.nextNode() as Text | null;
+          while (textNode) {
+            const text = textNode.data;
+            if (text && text.trim().length > 0) {
+              const owner = (textNode.parentElement || el) as HTMLElement;
+              const lines = collectTextLines(textNode);
+              if (lines.length > 0) {
+                const font = makeFont(getComputedStyle(owner)) as NonNullable<NodeRec['font']>;
+                pushTextNode(parentId, font, text, lines, undefined, 3);
+              }
+            }
+            textNode = walker.nextNode() as Text | null;
+          }
+        } else {
+          const hiddenText = collectFullRasterExtractableText(el);
+          if (hiddenText) {
+            const font = makeFont(cs) as NonNullable<NodeRec['font']>;
+            const fontSizePx = parseFloat(cs.fontSize) || 16;
+            const lineHeightRaw = parseFloat(cs.lineHeight);
+            const lineHeightPx = isNaN(lineHeightRaw) ? fontSizePx * 1.2 : lineHeightRaw;
+            const baselineY = rawY * layoutScale + Math.max(0, (lineHeightPx - fontSizePx) * 0.5) * layoutScale;
+            const utf8End = utf8Offsets(hiddenText)[hiddenText.length];
+            pushTextNode(parentId, font, hiddenText, [{
+              x: rawX * layoutScale,
+              y: baselineY,
+              w: Math.max(1, scaledW),
+              h: Math.max(1, lineHeightPx * layoutScale),
+              start: 0,
+              end: utf8End,
+            }], undefined, 3);
+          }
+        }
         return;
       }
     }
@@ -2597,8 +2851,7 @@ function buildInlineRunsWithLangFont(
     // the alpha channel and paints an opaque rect. Pre-multiply with the nearest
     // opaque ancestor background so the blended colour matches the browser.
     if (bg[3] > 0.001 && bg[3] < 1) {
-      const backdrop = findOpaqueBackdropColor(el);
-      const bd = parseColor(backdrop);
+      const bd = await resolveBackdropColor(el, rawRect);
       const a = bg[3];
       const invA = 1 - a;
       bg = [
@@ -2666,7 +2919,12 @@ function buildInlineRunsWithLangFont(
     const dm = el.dataset.dom2pdfMode;
     const renderMode = dm === 'raster' ? 1 : dm === 'skip' ? 2 : 0;
 
-    const divisionDisable = el.hasAttribute('divisionDisable');
+    const breakInside = cs.breakInside || cs.getPropertyValue('break-inside');
+    const pageBreakInside = cs.getPropertyValue('page-break-inside');
+    const divisionDisable = el.hasAttribute('divisionDisable')
+      || breakInside === 'avoid'
+      || breakInside === 'avoid-page'
+      || pageBreakInside === 'avoid';
     const pageBreak = el.hasAttribute('pageBreak');
 
     let flags = 0;
@@ -2963,7 +3221,7 @@ function buildInlineRunsWithLangFont(
       for (const { cell } of deferred) {
         let forcedBg: [number, number, number, number] | undefined;
         if (collapsed && parseColor(getComputedStyle(cell).backgroundColor)[3] <= 0.001) {
-          forcedBg = parseColor(findOpaqueBackdropColor(cell));
+          forcedBg = await resolveBackdropColor(cell, cell.getBoundingClientRect());
         }
         await visit(cell, id, forcedBg);
       }
