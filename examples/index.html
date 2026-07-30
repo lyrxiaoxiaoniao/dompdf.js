@@ -1,23 +1,23 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
+﻿<!DOCTYPE html>
+<html lang="en">
 
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>dompdf.js Studio - 纯 JavaScript DOM-to-PDF 渲染引擎 | 在线演示</title>
+  <title>dompdf.js Studio - Pure JavaScript DOM-to-PDF Engine | Live Demo</title>
 
   <meta name="description"
-    content="dompdf.js 是一个纯 JavaScript DOM-to-PDF 渲染库，无需后端。在线演示支持 HTML/Markdown 编辑、实时 PDF 预览、中文完美支持。">
-  <meta name="keywords" content="dompdf.js, DOM to PDF, JavaScript PDF, 前端PDF生成, HTML转PDF, 在线PDF编辑器">
+    content="dompdf.js is a pure JavaScript DOM-to-PDF renderer with no backend required. This live demo supports HTML and Markdown editing, real-time PDF preview, and high-fidelity multilingual export.">
+  <meta name="keywords" content="dompdf.js, DOM to PDF, JavaScript PDF, frontend PDF generation, HTML to PDF, live PDF editor">
   <link rel="canonical" href="https://dompdfjs.lisky.com.cn/">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="dompdf.js Studio - 纯 JavaScript DOM-to-PDF 渲染引擎">
-  <meta property="og:description" content="纯前端 DOM-to-PDF 渲染引擎，支持 HTML/Markdown 编辑、实时 PDF 预览、中文完美支持">
+  <meta property="og:title" content="dompdf.js Studio - Pure JavaScript DOM-to-PDF Engine">
+  <meta property="og:description" content="A browser-side DOM-to-PDF rendering engine with HTML and Markdown editing plus real-time PDF preview.">
   <meta property="og:url" content="https://dompdfjs.lisky.com.cn/">
   <meta property="og:site_name" content="dompdf.js Studio">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="dompdf.js Studio - 纯 JavaScript DOM-to-PDF 渲染引擎">
-  <meta name="twitter:description" content="纯前端 DOM-to-PDF 渲染引擎，支持 HTML/Markdown 编辑、实时 PDF 预览">
+  <meta name="twitter:title" content="dompdf.js Studio - Pure JavaScript DOM-to-PDF Engine">
+  <meta name="twitter:description" content="A browser-side DOM-to-PDF rendering engine with HTML and Markdown editing plus real-time PDF preview.">
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -25,7 +25,7 @@
     "name": "dompdf.js",
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Web",
-    "description": "纯 JavaScript DOM-to-PDF 渲染引擎",
+    "description": "Pure JavaScript DOM-to-PDF rendering engine",
     "url": "https://dompdfjs.lisky.com.cn/"
   }
   </script>
@@ -76,6 +76,10 @@
         </div>
 
         <div class="sidebar-status-wrap">
+          <div class="lang-switch" role="group" aria-label="Language switch">
+            <button class="lang-switch-btn active" id="lang-btn-en" type="button" onclick="setLanguage('en')">EN</button>
+            <button class="lang-switch-btn" id="lang-btn-zh" type="button" onclick="setLanguage('zh')">中</button>
+          </div>
           <div class="sidebar-status" style="display: none;">
             <span id="status-dot" class="status-dot loading"></span>
             <span id="status-text">引用中...</span>
@@ -101,7 +105,7 @@
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                导出 dompdf.js
+                <span class="btn-label">导出 dompdf.js</span>
               </button>
               <button class="action-btn action-btn-html2pdf" id="btn-export-html2pdf" onclick="exportHtml2pdf()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -109,14 +113,14 @@
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                导出 html2pdf.js
+                <span class="btn-label">导出 html2pdf.js</span>
               </button>
             </div>
             <button class="action-btn action-btn-compare" id="btn-compare" onclick="runCompare()">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
               </svg>
-              一键性能对比
+              <span class="btn-label">一键性能对比</span>
             </button>
           </div>
         </div>
@@ -148,11 +152,11 @@
         <div class="sidebar-section">
           <div class="sidebar-section-title">对比结果</div>
           <div class="metric-row-flat">
-            <span class="metric-row-label">dompdf.js 耗时</span>
+            <span class="metric-row-label" id="label-speed-dompdf">dompdf.js 耗时</span>
             <span class="metric-row-value dompdf-color" id="speed-dompdf">--</span>
           </div>
           <div class="metric-row-flat">
-            <span class="metric-row-label">html2pdf.js 耗时</span>
+            <span class="metric-row-label" id="label-speed-html2pdf">html2pdf.js 耗时</span>
             <span class="metric-row-value html2pdf-color" id="speed-html2pdf">--</span>
           </div>
           <div class="metric-bar-wrapper" style="margin: 6px 0 2px;">
@@ -162,11 +166,11 @@
           <div class="metric-delta" id="speed-delta"></div>
 
           <div class="metric-row-flat" style="margin-top: 10px;">
-            <span class="metric-row-label">dompdf.js 体积</span>
+            <span class="metric-row-label" id="label-size-dompdf">dompdf.js 体积</span>
             <span class="metric-row-value dompdf-color" id="size-dompdf">--</span>
           </div>
           <div class="metric-row-flat">
-            <span class="metric-row-label">html2pdf.js 体积</span>
+            <span class="metric-row-label" id="label-size-html2pdf">html2pdf.js 体积</span>
             <span class="metric-row-value html2pdf-color" id="size-html2pdf">--</span>
           </div>
           <div class="metric-bar-wrapper" style="margin: 6px 0 2px;">
@@ -312,7 +316,7 @@
               </aside>
             </header>
 
-            <section class="report-kpi-grid" aria-label="Top metrics">
+            <div class="report-kpi-grid" aria-label="Top metrics">
               <div class="report-kpi">
                 <div class="report-kpi-label">文档宽度</div>
                 <strong>794px</strong>
@@ -333,7 +337,7 @@
                 <strong>体积 / 版式 / 复制</strong>
                 <span>不仅看速度，也看最终 PDF 品质</span>
               </div>
-            </section>
+            </div>
 
             <section class="report-section">
               <div class="report-section-head">
@@ -376,7 +380,7 @@
               </div>
             </section>
 
-            <section class="report-section">
+            <!-- <section class="report-section">
               <div class="report-section-head">
                 <div class="report-section-index">02</div>
                 <div>
@@ -432,10 +436,10 @@
                   </div>
                 </section>
               </div>
-            </section>
+            </section> -->
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">03</div>
+                <div class="report-section-index">02</div>
                 <div>
                   <div class="report-section-kicker">Pseudo-classes</div>
                   <h2>CSS 伪元素与矢量渲染能力</h2>
@@ -492,7 +496,7 @@
 
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">04</div>
+                <div class="report-section-index">03</div>
                 <div>
                   <div class="report-section-kicker">Graphics</div>
                   <h2>矢量图形与位图样本</h2>
@@ -578,7 +582,7 @@
 
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">05</div>
+                <div class="report-section-index">04</div>
                 <div>
                   <div class="report-section-kicker">Layout</div>
                   <h2>布局、裁切、透明度与流程图</h2>
@@ -646,7 +650,7 @@
 
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">06</div>
+                <div class="report-section-index">05</div>
                 <div>
                   <div class="report-section-kicker">Structured Data</div>
                   <h2>结构化表格与文本检索</h2>
@@ -690,7 +694,7 @@
 
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">07</div>
+                <div class="report-section-index">06</div>
                 <div>
                   <div class="report-section-kicker">Reference Blocks</div>
                   <h2>定义列表、代码块与数学符号</h2>
@@ -720,7 +724,7 @@
                     </div>
                   </dl>
                 </section>
-                <section class="rich-card">
+                <section class="rich-card" divisionDisable>
                   <h3>Preformatted Flow</h3>
                   <pre class="report-code"><code>render(root)
   -> collectSnapshotData(root)
@@ -751,7 +755,7 @@
 
             <section class="report-section">
               <div class="report-section-head">
-                <div class="report-section-index">08</div>
+                <div class="report-section-index">07</div>
                 <div>
                   <div class="report-section-kicker">Pagination</div>
                   <h2>分页压力测试与附录</h2>
