@@ -32,11 +32,13 @@ function categoryLabel(cat) {
     'font-family':  '字体选择 (font-family)',
     'color':        '颜色偏差 (color)',
     'bg-color':     '背景色偏差 (bg-color)',
+    'bg-missing-capture': '背景漏采 (bg-missing-capture)',
     'border':       '边框缺失/偏差 (border)',
     'shadow':       '阴影 (shadow)',
     'image':        '图片差异 (image)',
     'transform':    '变换矩阵 (transform)',
     'icon':         '图标 (icon)',
+    'raster-geometry-drift': '位图几何漂移 (raster-geometry-drift)',
   };
   return labels[cat] || cat;
 }
@@ -178,7 +180,15 @@ export function buildMarkdownReport(report) {
     lines.push(`### 视觉差异明细`);
     lines.push(``);
     for (const d of vDiscrepancies) {
-      const kindLabel = d.kind === 'bg-color' ? '背景色' : d.kind === 'border' ? '边框' : d.kind;
+      const kindLabel = d.kind === 'bg-color'
+        ? '背景色'
+        : d.kind === 'bg-missing-capture'
+          ? '背景漏采'
+          : d.kind === 'border'
+            ? '边框'
+            : d.kind === 'raster-geometry-drift'
+              ? '位图几何漂移'
+              : d.kind;
       lines.push(`- **${kindLabel}** \`<${d.tag}>\` (${d.nodeId}) — 第 ${d.page} 页`);
       lines.push(`  - 位置：x=${d.box.x}, y=${d.box.y}, w=${d.box.w}, h=${d.box.h}`);
       if (d.expected) lines.push(`  - 期望：\`${d.expected}\``);
