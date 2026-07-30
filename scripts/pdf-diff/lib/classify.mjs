@@ -15,9 +15,11 @@ const SUSPECTED = {
   'missing-glyph': { file: 'wasm/src/font.rs', fn: 'encode_cid (per-glyph fallback)', also: 'wasm/src/ttf.rs gid_for (cmap miss → gid 0/.notdef)' },
   color: { file: 'src/snapshot.ts', fn: 'color parsing', also: 'wasm/src/paginate.rs (alpha compositing)' },
   'bg-color': { file: 'src/snapshot.ts', fn: 'background-color capture', also: 'wasm/src/paginate.rs (rect fill / alpha)' },
+  'bg-missing-capture': { file: 'src/snapshot.ts', fn: 'background-color capture', also: 'scripts/pdf-diff/lib/visualdiff.mjs (surround-vs-interior heuristic)' },
   border: { file: 'src/snapshot.ts', fn: 'border capture', also: 'wasm/src/paginate.rs (border stroke)' },
   shadow: { file: 'src/snapshot.ts', fn: 'box-shadow capture', also: 'wasm/src/paginate.rs (shadow paint — may be unimplemented)' },
   icon: { file: 'wasm/src/snapshot.rs', fn: 'Image', also: 'wasm/src/paginate.rs (image/svg render) / useCORS' },
+  'raster-geometry-drift': { file: 'src/snapshot.ts', fn: 'background-raster / full-raster geometry', also: 'wasm/src/paginate.rs (image placement)' },
   image: { file: 'wasm/src/snapshot.rs', fn: 'Image', also: 'wasm/src/paginate.rs (image render) / useCORS' },
   transform: { file: 'wasm/src/paginate.rs', fn: 'transform matrix', also: 'src/snapshot.ts (transform capture)' },
   wrap: { file: 'wasm/src/paginate.rs', fn: 'line breaking', also: 'wasm/src/font.rs text_width_units' },
@@ -33,9 +35,11 @@ const HINTS = {
   'missing-glyph': 'Specific codepoints present in the browser text are absent from the PDF text stream and render as blank .notdef, while the rest of the text extracts fine (charCoverage stays near 1). Signature of a cmap miss with no per-glyph font fallback: the selected CID font lacks these glyphs (gid_for → 0 in ttf.rs) and encode_cid emits the blank glyph instead of falling back to another embedded font that covers the codepoint. Check encode_cid in font.rs and route missing codepoints to a fallback font.',
   color: 'Colors differ while text positions align. Check color parsing in src/snapshot.ts and alpha compositing in paginate.rs.',
   'bg-color': "An element's painted background color diverges from the browser (located per element, ΔE in Lab). Check background-color capture in src/snapshot.ts and rect fill/alpha in paginate.rs.",
+  'bg-missing-capture': "The browser paints a distinct interior color, but dompdf matches the surrounding backdrop instead. This usually means the background was lost during snapshot capture before paginate.rs ever saw it.",
   border: "An element's border color/presence diverges from the browser at the box edge. Check border capture in src/snapshot.ts and border stroking in paginate.rs.",
   shadow: 'The dompdf raster lacks the box-shadow the browser paints just outside the box. Likely box-shadow is unimplemented in paginate.rs (or not captured in snapshot.ts). Low confidence / known gap.',
   icon: 'An icon region (img/svg/background-image) differs from the browser (localized pixel mismatch). Check Image capture in snapshot.rs, image/SVG placement in paginate.rs, and CORS/useCORS handling.',
+  'raster-geometry-drift': 'A raster-like region only aligns after a significant dx/dy offset. Check background/full-raster geometry capture in src/snapshot.ts before inspecting paginate.rs image placement.',
   image: 'Image missing or misplaced. Check Image capture in snapshot.rs, image placement in paginate.rs, and CORS/useCORS handling.',
   transform: 'Whole subtree is shifted by a constant Δx/Δy. Check the transform matrix application in paginate.rs and transform capture in src/snapshot.ts.',
   wrap: 'Text wraps differently (many unmatched actual/oracle items). Check line-breaking in paginate.rs and the text-width measurement feeding it.',
@@ -250,6 +254,7 @@ export function classify({ textDiff, pixelDiff, visualDiff, inspectText, meta })
     });
     // shadow is a known low-confidence gap; never escalate it on count alone.
     if (kind === 'shadow') cat.severity = 'low';
+    else if (kind === 'bg-missing-capture' || kind === 'raster-geometry-drift') cat.severity = discs.length >= 3 ? 'high' : 'medium';
     else cat.severity = discs.length >= 20 ? 'high' : discs.length >= 5 ? 'medium' : 'low';
     cat.samples = discs.slice(0, 5);
     categories.push(cat);
