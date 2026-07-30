@@ -153,6 +153,10 @@ fn normalize_text_for_pdf(text: &str, preserve_whitespace: bool) -> String {
     out
 }
 
+fn prepare_text_for_pdf(text: &str, preserve_whitespace: bool) -> String {
+    normalize_text_for_pdf(text, preserve_whitespace)
+}
+
 fn approx_eq(a: f32, b: f32) -> bool {
     (a - b).abs() < 0.01
 }
@@ -444,41 +448,54 @@ fn apply_break_directives(snap: &mut Snapshot, children: &[Vec<usize>], content_
         .map(|(i, _)| i)
         .collect();
 
-    // Pass 1: pageBreak — push node to the next page boundary (strictly greater).
-    // Preorder so cascading breaks accumulate.
-    fn walk_break(
-        snap: &mut Snapshot,
-        children: &[Vec<usize>],
-        idx: usize,
-        content_h_px: f32,
-    ) {
-        let pb = snap.nodes[idx].page_break;
-        if pb {
-            let y = snap.nodes[idx].y;
-            let target = ((y / content_h_px).floor() + 1.0) * content_h_px;
-            let gap = target - y;
-            if gap > 0.0 {
-                shift_flow_tail(snap, children, idx, gap);
-            }
+    fn page_break_gap(y: f32, content_h_px: f32) -> f32 {
+        if content_h_px <= 0.0 {
+            return 0.0;
         }
-        let kids: Vec<usize> = children[idx].clone();
-        for c in kids {
-            walk_break(snap, children, c, content_h_px);
+        let page = (y / content_h_px).floor();
+        let boundary = page * content_h_px;
+        // Once a pageBreak-marked block has already landed on a boundary,
+        // keep it there; iterative divisionDisable/pageBreak passes must not
+        // keep pushing it one more full page.
+        if (y - boundary).abs() <= 0.5 {
+            return 0.0;
         }
-    }
-    for &r in &roots {
-        walk_break(snap, children, r, content_h_px);
+        let target = (page + 1.0) * content_h_px;
+        let gap = target - y;
+        if gap > 0.0 { gap } else { 0.0 }
     }
 
-    // Pass 2: divisionDisable — if a box subtree straddles a page boundary and
-    // fits within one page, move it to the next boundary. Iterate to stable.
-    let mut subtree_min_y = vec![0.0_f32; snap.nodes.len()];
-    let mut subtree_max_y = vec![0.0_f32; snap.nodes.len()];
-    for &r in &roots {
-        compute_subtree_bounds(snap, children, r, &mut subtree_min_y, &mut subtree_max_y);
-    }
+    // pageBreak and divisionDisable influence the same downstream flow. Run
+    // them together until positions stabilize so a later container move cannot
+    // invalidate an earlier pageBreak placement.
     for _ in 0..8 {
         let mut moved = false;
+        // Pass 1: pageBreak — preorder so cascading breaks accumulate.
+        fn walk_break(
+            snap: &mut Snapshot,
+            children: &[Vec<usize>],
+            idx: usize,
+            content_h_px: f32,
+            moved: &mut bool,
+        ) {
+            if snap.nodes[idx].page_break {
+                let gap = page_break_gap(snap.nodes[idx].y, content_h_px);
+                if gap > 0.0 {
+                    shift_flow_tail(snap, children, idx, gap);
+                    *moved = true;
+                }
+            }
+            let kids: Vec<usize> = children[idx].clone();
+            for c in kids {
+                walk_break(snap, children, c, content_h_px, moved);
+            }
+        }
+        for &r in &roots {
+            walk_break(snap, children, r, content_h_px, &mut moved);
+        }
+
+        // Pass 2: divisionDisable — if a box subtree straddles a page boundary
+        // and fits within one page, move it to the next boundary.
         let div_nodes: Vec<usize> = snap
             .nodes
             .iter()
@@ -762,6 +779,62 @@ fn rect_pt(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h_px: f32
     (x0, bottom, w, h)
 }
 
+#[derive(Clone, Copy)]
+struct BoxFragment {
+    x0: f32,
+    bottom: f32,
+    w: f32,
+    h: f32,
+    first: bool,
+    last: bool,
+}
+
+fn box_fragment_pt(
+    snap: &Snapshot,
+    geo: &Geo,
+    node: &Node,
+    page: u32,
+    content_h_px: f32,
+    page_h_pt: f32,
+) -> Option<BoxFragment> {
+    let band_top = page as f32 * content_h_px;
+    let band_bottom = (page + 1) as f32 * content_h_px;
+    let frag_top_px = node.y.max(band_top);
+    let frag_bottom_px = (node.y + node.h).min(band_bottom);
+    if frag_bottom_px <= frag_top_px + 1e-3 {
+        return None;
+    }
+    let x0 = snap.margin_left + node.x * PX_TO_PT;
+    let top_pt = page_h_pt - snap.margin_top - geo.header_h_pt - (frag_top_px - band_top) * PX_TO_PT;
+    let w = node.w * PX_TO_PT;
+    let h = (frag_bottom_px - frag_top_px) * PX_TO_PT;
+    Some(BoxFragment {
+        x0,
+        bottom: top_pt - h,
+        w,
+        h,
+        first: frag_top_px <= node.y + 1e-3,
+        last: frag_bottom_px >= node.y + node.h - 1e-3,
+    })
+}
+
+fn fragment_radii_pt(node: &Node, w: f32, h: f32, first: bool, last: bool) -> Option<[f32; 4]> {
+    let mut radii = rounded_rect_radii_pt(node, w, h)?;
+    if !first {
+        radii[0] = 0.0;
+        radii[1] = 0.0;
+    }
+    if !last {
+        radii[2] = 0.0;
+        radii[3] = 0.0;
+    }
+    if radii.iter().all(|r| *r <= 0.0) {
+        None
+    } else {
+        Some(radii)
+    }
+}
+
 fn find_image<'a>(snap: &'a Snapshot, image_id: u32) -> Option<&'a Image> {
     snap.images.iter().find(|img| img.id == image_id)
 }
@@ -837,18 +910,19 @@ fn draw_node(
             let clip = vis && node.overflow_hidden;
             if clip {
                 out.push_str("q\n");
-                let (x0, bottom, w, h) = rect_pt(snap, &geo, node, page, content_h_px, page_h_pt);
-                if let Some(radii) = rounded_rect_radii_pt(node, w, h) {
-                    push_rounded_rect_path(out, x0, bottom, w, h, radii);
-                    out.push_str("W n\n");
-                } else {
-                    out.push_str(&format!(
-                        "{} {} {} {} re W n\n",
-                        f(x0),
-                        f(bottom),
-                        f(w),
-                        f(h)
-                    ));
+                if let Some(frag) = box_fragment_pt(snap, &geo, node, page, content_h_px, page_h_pt) {
+                    if let Some(radii) = fragment_radii_pt(node, frag.w, frag.h, frag.first, frag.last) {
+                        push_rounded_rect_path(out, frag.x0, frag.bottom, frag.w, frag.h, radii);
+                        out.push_str("W n\n");
+                    } else {
+                        out.push_str(&format!(
+                            "{} {} {} {} re W n\n",
+                            f(frag.x0),
+                            f(frag.bottom),
+                            f(frag.w),
+                            f(frag.h)
+                        ));
+                    }
                 }
             }
             for &c in children[idx].iter() {
@@ -925,17 +999,25 @@ fn draw_node(
 }
 
 fn draw_box_bg(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h_px: f32, page_h_pt: f32, out: &mut String) {
-    let (x0, bottom, w, h) = rect_pt(snap, geo, node, page, content_h_px, page_h_pt);
-    let radii = rounded_rect_radii_pt(node, w, h);
+    let Some(frag) = box_fragment_pt(snap, geo, node, page, content_h_px, page_h_pt) else {
+        return;
+    };
+    let radii = fragment_radii_pt(node, frag.w, frag.h, frag.first, frag.last);
     if let Some(bg) = node.bg {
         if bg[3] > 0.001 {
             out.push_str("q\n");
             out.push_str(&format!("{} {} {} rg\n", f(bg[0]), f(bg[1]), f(bg[2])));
             if let Some(radii) = radii {
-                push_rounded_rect_path(out, x0, bottom, w, h, radii);
+                push_rounded_rect_path(out, frag.x0, frag.bottom, frag.w, frag.h, radii);
                 out.push_str("f\n");
             } else {
-                out.push_str(&format!("{} {} {} {} re f\n", f(x0), f(bottom), f(w), f(h)));
+                out.push_str(&format!(
+                    "{} {} {} {} re f\n",
+                    f(frag.x0),
+                    f(frag.bottom),
+                    f(frag.w),
+                    f(frag.h)
+                ));
             }
             out.push_str("Q\n");
         }
@@ -946,15 +1028,17 @@ fn draw_box_shadow(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
     if node.shadow.is_empty() {
         return;
     }
-    let (x0, bottom, w, h) = rect_pt(snap, geo, node, page, content_h_px, page_h_pt);
-    let base_radii = rounded_rect_radii_pt(node, w, h);
+    let Some(frag) = box_fragment_pt(snap, geo, node, page, content_h_px, page_h_pt) else {
+        return;
+    };
+    let base_radii = fragment_radii_pt(node, frag.w, frag.h, frag.first, frag.last);
     // CSS paints shadow layers first-to-last with earlier layers on top, so draw
     // in reverse order to stack them correctly.
     for shadow in node.shadow.iter().rev() {
         if shadow.color[3] <= 0.001 {
             continue;
         }
-        draw_one_shadow(shadow, x0, bottom, w, h, base_radii, out);
+        draw_one_shadow(shadow, frag.x0, frag.bottom, frag.w, frag.h, base_radii, out);
     }
 }
 
@@ -1026,59 +1110,74 @@ fn draw_one_shadow(
 }
 
 fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h_px: f32, page_h_pt: f32, out: &mut String) {
-    let (x0, bottom, w, h) = rect_pt(snap, geo, node, page, content_h_px, page_h_pt);
-    let radii = rounded_rect_radii_pt(node, w, h);
+    let Some(frag) = box_fragment_pt(snap, geo, node, page, content_h_px, page_h_pt) else {
+        return;
+    };
+    let x0 = frag.x0;
+    let bottom = frag.bottom;
+    let w = frag.w;
+    let h = frag.h;
+    let radii = fragment_radii_pt(node, w, h, frag.first, frag.last);
     if let Some(b) = &node.border {
+        let mut widths = b.w;
+        if !frag.first {
+            widths[0] = 0.0;
+        }
+        if !frag.last {
+            widths[2] = 0.0;
+        }
         // Rounded-rect fast path: when width, style, radii AND color are uniform
         // across all four sides, draw the border ring as a fill instead of
         // centering a stroke on the outer edge. Browser borders live inside the
         // border box; stroking the outer path loses half the line outside the box
         // and makes thin top borders look missing in raster comparisons.
-        if let (Some(radii), Some(bw), Some(style), Some(col)) = (
-            radii,
-            uniform_border_width_pt(node),
-            uniform_border_style(node),
-            uniform_border_color(node),
-        ) {
-            let alpha = col[3];
-            let use_alpha = alpha > 0.0 && alpha < 0.999;
-            if use_alpha {
-                out.push_str("q\n");
-                out.push_str(&format!("/{} gs\n", opacity_resource_name(opacity_key(alpha))));
-            }
-            if style == BORDER_SOLID {
-                out.push_str(&format!("{} {} {} rg\n", f(col[0]), f(col[1]), f(col[2])));
-                push_rounded_rect_path(out, x0, bottom, w, h, radii);
-                let inner_x = x0 + bw;
-                let inner_bottom = bottom + bw;
-                let inner_w = (w - bw * 2.0).max(0.0);
-                let inner_h = (h - bw * 2.0).max(0.0);
-                if inner_w > 0.01 && inner_h > 0.01 {
-                    if let Some(inner_radii) = inset_radii(radii, bw) {
-                        push_rounded_rect_path(out, inner_x, inner_bottom, inner_w, inner_h, inner_radii);
-                    } else {
-                        out.push_str(&format!(
-                            "{} {} {} {} re\n",
-                            f(inner_x),
-                            f(inner_bottom),
-                            f(inner_w),
-                            f(inner_h)
-                        ));
-                    }
+        if frag.first && frag.last {
+            if let (Some(radii), Some(bw), Some(style), Some(col)) = (
+                radii,
+                uniform_border_width_pt(node),
+                uniform_border_style(node),
+                uniform_border_color(node),
+            ) {
+                let alpha = col[3];
+                let use_alpha = alpha > 0.0 && alpha < 0.999;
+                if use_alpha {
+                    out.push_str("q\n");
+                    out.push_str(&format!("/{} gs\n", opacity_resource_name(opacity_key(alpha))));
                 }
-                out.push_str("f*\n");
-            } else {
-                // Dashed borders still rely on stroke semantics.
-                out.push_str(&format!("{} {} {} RG {} w\n", f(col[0]), f(col[1]), f(col[2]), f(bw)));
-                set_dash(out, style, bw);
-                push_rounded_rect_path(out, x0, bottom, w, h, radii);
-                out.push_str("S\n");
-                out.push_str("[] 0 d\n");
+                if style == BORDER_SOLID {
+                    out.push_str(&format!("{} {} {} rg\n", f(col[0]), f(col[1]), f(col[2])));
+                    push_rounded_rect_path(out, x0, bottom, w, h, radii);
+                    let inner_x = x0 + bw;
+                    let inner_bottom = bottom + bw;
+                    let inner_w = (w - bw * 2.0).max(0.0);
+                    let inner_h = (h - bw * 2.0).max(0.0);
+                    if inner_w > 0.01 && inner_h > 0.01 {
+                        if let Some(inner_radii) = inset_radii(radii, bw) {
+                            push_rounded_rect_path(out, inner_x, inner_bottom, inner_w, inner_h, inner_radii);
+                        } else {
+                            out.push_str(&format!(
+                                "{} {} {} {} re\n",
+                                f(inner_x),
+                                f(inner_bottom),
+                                f(inner_w),
+                                f(inner_h)
+                            ));
+                        }
+                    }
+                    out.push_str("f*\n");
+                } else {
+                    // Dashed borders still rely on stroke semantics.
+                    out.push_str(&format!("{} {} {} RG {} w\n", f(col[0]), f(col[1]), f(col[2]), f(bw)));
+                    set_dash(out, style, bw);
+                    push_rounded_rect_path(out, x0, bottom, w, h, radii);
+                    out.push_str("S\n");
+                    out.push_str("[] 0 d\n");
+                }
+                if use_alpha {
+                    out.push_str("Q\n");
+                }
+                return;
             }
-            if use_alpha {
-                out.push_str("Q\n");
-            }
-            return;
         }
         let top_pt = bottom + h;
         let right = x0 + w;
@@ -1156,52 +1255,52 @@ fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
         };
         if b.s[0] == BORDER_SOLID {
             if radii.is_some() {
-                fill_side_with_clip(0, b.w[0], &b.c[0], out);
+                fill_side_with_clip(0, widths[0], &b.c[0], out);
             } else {
-                fill_side_rect(0, b.w[0], &b.c[0], out);
+                fill_side_rect(0, widths[0], &b.c[0], out);
             }
         } else {
             stroke_side(
-                b.w[0], b.s[0], &b.c[0],
+                widths[0], b.s[0], &b.c[0],
                 &format!("{} {} m {} {} l S\n", f(x0), f(top_pt), f(right), f(top_pt)),
                 out,
             );
         }
         if b.s[1] == BORDER_SOLID {
             if radii.is_some() {
-                fill_side_with_clip(1, b.w[1], &b.c[1], out);
+                fill_side_with_clip(1, widths[1], &b.c[1], out);
             } else {
-                fill_side_rect(1, b.w[1], &b.c[1], out);
+                fill_side_rect(1, widths[1], &b.c[1], out);
             }
         } else {
             stroke_side(
-                b.w[1], b.s[1], &b.c[1],
+                widths[1], b.s[1], &b.c[1],
                 &format!("{} {} m {} {} l S\n", f(right), f(top_pt), f(right), f(bottom)),
                 out,
             );
         }
         if b.s[2] == BORDER_SOLID {
             if radii.is_some() {
-                fill_side_with_clip(2, b.w[2], &b.c[2], out);
+                fill_side_with_clip(2, widths[2], &b.c[2], out);
             } else {
-                fill_side_rect(2, b.w[2], &b.c[2], out);
+                fill_side_rect(2, widths[2], &b.c[2], out);
             }
         } else {
             stroke_side(
-                b.w[2], b.s[2], &b.c[2],
+                widths[2], b.s[2], &b.c[2],
                 &format!("{} {} m {} {} l S\n", f(x0), f(bottom), f(right), f(bottom)),
                 out,
             );
         }
         if b.s[3] == BORDER_SOLID {
             if radii.is_some() {
-                fill_side_with_clip(3, b.w[3], &b.c[3], out);
+                fill_side_with_clip(3, widths[3], &b.c[3], out);
             } else {
-                fill_side_rect(3, b.w[3], &b.c[3], out);
+                fill_side_rect(3, widths[3], &b.c[3], out);
             }
         } else {
             stroke_side(
-                b.w[3], b.s[3], &b.c[3],
+                widths[3], b.s[3], &b.c[3],
                 &format!("{} {} m {} {} l S\n", f(x0), f(top_pt), f(x0), f(bottom)),
                 out,
             );
@@ -1295,7 +1394,7 @@ fn collect_used_cid_gids(snap: &Snapshot, fontctx: &FontCtx, total: u32) {
             if e <= s {
                 continue;
             }
-            let normalized = normalize_text_for_pdf(&txt[s..e], font.preserve_whitespace);
+            let normalized = prepare_text_for_pdf(&txt[s..e], font.preserve_whitespace);
             if normalized.is_empty() {
                 continue;
             }
@@ -1381,7 +1480,7 @@ fn draw_text_lines(
         if seg.is_empty() {
             continue;
         }
-        let normalized = normalize_text_for_pdf(seg, font.preserve_whitespace);
+        let normalized = prepare_text_for_pdf(seg, font.preserve_whitespace);
         if normalized.is_empty() {
             continue;
         }
