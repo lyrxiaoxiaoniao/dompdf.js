@@ -1962,6 +1962,7 @@ body.dompdf-overlay #document * {
 
 .md-panel-stats {
   display: flex;
+  align-items: center;
   min-width: 0;
   gap: 6px;
 }
@@ -2448,4 +2449,127 @@ body.dompdf-overlay #document * {
   font-size: 0.9em;
   color: #94a3b8;
   font-weight: 400;
+}
+
+/* Form Controls Demo */
+.form-demo-card {
+  gap: 16px;
+}
+
+.form-demo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 16px;
+}
+
+.form-demo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.form-demo-field-full {
+  grid-column: 1 / -1;
+}
+
+.form-demo-field input,
+.form-demo-field select,
+.form-demo-field textarea,
+.form-demo-field progress,
+.form-demo-field meter {
+  width: 100%;
+}
+
+.form-demo-field input,
+.form-demo-field select,
+.form-demo-field textarea {
+  min-height: 38px;
+  padding: 9px 11px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  color: #0f172a;
+  font: inherit;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.03);
+}
+
+.form-demo-field textarea {
+  min-height: 110px;
+  resize: vertical;
+  line-height: 1.55;
+}
+
+.form-demo-field select[multiple] {
+  min-height: 110px;
+  padding-block: 6px;
+}
+
+.form-demo-field input[readonly] {
+  background: #f8fafc;
+}
+
+.form-demo-field input:disabled {
+  background: #f1f5f9;
+  color: #94a3b8;
+}
+
+.form-demo-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-demo-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+}
+
+.form-demo-row-title {
+  min-width: 72px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.form-check-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.form-check-chip input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
+.form-meter-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.form-demo-field progress,
+.form-demo-field meter {
+  height: 14px;
+  accent-color: #2563eb;
+}
+
+@media (max-width: 900px) {
+  .form-demo-grid,
+  .form-meter-grid {
+    grid-template-columns: 1fr;
+  }
 }
