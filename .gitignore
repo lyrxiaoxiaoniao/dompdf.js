@@ -5,6 +5,7 @@ node_modules/
 /dist
 /tmp
 /build
+/web/.next/
 
 # Rust / WASM build artifacts
 /wasm/target/
@@ -45,3 +46,7 @@ tests/reftests.js
 diagnose-output.txt
 diagnose-stderr.txt
 scripts/diagnose-*.pdf
+
+.codex
+
+web
