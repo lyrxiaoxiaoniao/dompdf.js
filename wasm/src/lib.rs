@@ -156,10 +156,11 @@ pub extern "C" fn inspect(in_ptr: *const u8, in_len: usize) -> usize {
                 }
             };
             let mut buf = format!(
-                "nodes={} images={} fonts={} pages={}\n",
+                "nodes={} images={} fonts={} form_fields={} pages={}\n",
                 snap.nodes.len(),
                 snap.images.len(),
                 snap.fonts.len(),
+                snap.form_fields.len(),
                 total
             );
             for n in &snap.nodes {
@@ -187,6 +188,19 @@ pub extern "C" fn inspect(in_ptr: *const u8, in_len: usize) -> usize {
                     buf.push_str(&format!(" imageId={}", img.id));
                 }
                 buf.push('\n');
+            }
+            for field in &snap.form_fields {
+                buf.push_str(&format!(
+                    "  form#{} node={} kind={} interactive={} name=\"{}\" value=\"{}\" placeholderShown={} options={}\n",
+                    field.id,
+                    field.node_id,
+                    field.kind,
+                    field.interactive_kind,
+                    field.name,
+                    field.value,
+                    field.placeholder_shown,
+                    field.options.len()
+                ));
             }
             // Also dump all pages content (truncated per page).
             for (pi, p) in pages.iter().enumerate() {

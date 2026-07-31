@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="en">
 
 <head>
@@ -67,6 +67,7 @@
   <script src="./vendor/dompurify.min.js"></script>
   <script src="./vendor/marked.min.js"></script>
   <script src="../dist/dompdf.js"></script>
+  <!-- <script src="https://cdn.jsdelivr.net/npm/dompdf.js@latest/dist/dompdf.min.js"></script> -->
   <script src="./vendor/vditor/dist/index.min.js"></script>
 </head>
 
@@ -471,26 +472,49 @@
                     过度使用 <code>::before</code>/<code>::after</code> 可能会轻微降低 DOM Walk 阶段的解析效率，但不会影响最终 PDF 体积。
                   </div>
                   <div style="margin-top: 16px; padding-top: 14px; border-top: 1px dashed #e2e8f0;">
-                    <h4 style="font-size: 13px; color: #1e293b; margin-bottom: 8px; font-weight: 600;">列表伪元素标记
-                      (::marker)</h4>
-                    <div style="display: flex; gap: 20px;">
-                      <div style="flex: 1;">
-                        <span
-                          style="font-size: 11px; color: #64748b; display: block; margin-bottom: 4px; font-weight: 500;">无序列表
-                          (ul > li)</span>
-                        <ul style="margin: 0; padding-left: 18px; font-size: 12.5px; color: #334155; line-height: 1.6;">
-                          <li>无序列表项 A</li>
-                          <li>无序列表项 B</li>
-                        </ul>
+                    <h4 style="font-size: 13px; color: #1e293b; margin-bottom: 8px; font-weight: 600;">列表伪元素标记 (::marker)</h4>
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                      <div style="display: flex; gap: 20px;">
+                        <div style="flex: 1;">
+                          <span style="font-size: 11px; color: #64748b; display: block; margin-bottom: 4px; font-weight: 500;">无序列表 (disc)</span>
+                          <ul style="margin: 0; padding-left: 18px; font-size: 12.5px; color: #334155; line-height: 1.6;">
+                            <li>无序列表项 A</li>
+                            <li>无序列表项 B</li>
+                            <li>无序列表项 C</li>
+                          </ul>
+                        </div>
+                        <div style="flex: 1;">
+                          <span style="font-size: 11px; color: #64748b; display: block; margin-bottom: 4px; font-weight: 500;">有序列表 (decimal)</span>
+                          <ol style="margin: 0; padding-left: 18px; font-size: 12.5px; color: #334155; line-height: 1.6;">
+                            <li>顺序序列项 1</li>
+                            <li>顺序序列项 2</li>
+                            <li>顺序序列项 3</li>
+                          </ol>
+                        </div>
                       </div>
-                      <div style="flex: 1;">
-                        <span
-                          style="font-size: 11px; color: #64748b; display: block; margin-bottom: 4px; font-weight: 500;">有序列表
-                          (ol > li)</span>
-                        <ol style="margin: 0; padding-left: 18px; font-size: 12.5px; color: #334155; line-height: 1.6;">
-                          <li>顺序序列项 1</li>
-                          <li>顺序序列项 2</li>
-                        </ol>
+                      <div style="display: flex; gap: 20px;">
+                        <div style="flex: 1;">
+                          <span style="font-size: 11px; color: #64748b; display: block; margin-bottom: 4px; font-weight: 500;">自定义无序样式 (square / circle)</span>
+                          <ul style="margin: 0 0 8px 0; padding-left: 18px; font-size: 12.5px; color: #334155; line-height: 1.6; list-style-type: square;">
+                            <li>方块标记项</li>
+                            <li>强调型段落摘要</li>
+                          </ul>
+                          <ul style="margin: 0; padding-left: 18px; font-size: 12.5px; color: #334155; line-height: 1.6; list-style-type: circle;">
+                            <li>圆圈标记项</li>
+                            <li>次级信息说明</li>
+                          </ul>
+                        </div>
+                        <div style="flex: 1;">
+                          <span style="font-size: 11px; color: #64748b; display: block; margin-bottom: 4px; font-weight: 500;">替代有序样式 (upper-roman / lower-alpha)</span>
+                          <ol style="margin: 0 0 8px 0; padding-left: 20px; font-size: 12.5px; color: #334155; line-height: 1.6; list-style-type: upper-roman;">
+                            <li>阶段一：采样</li>
+                            <li>阶段二：编码</li>
+                          </ol>
+                          <ol style="margin: 0; padding-left: 20px; font-size: 12.5px; color: #334155; line-height: 1.6; list-style-type: lower-alpha;">
+                            <li>候选方案 a</li>
+                            <li>候选方案 b</li>
+                          </ol>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -774,9 +798,144 @@
               </section>
             </section>
 
-            <section class="report-section">
+            <section class="report-section" id="form-controls-section">
               <div class="report-section-head">
                 <div class="report-section-index">07</div>
+                <div>
+                  <div class="report-section-kicker" id="form-controls-kicker">Forms</div>
+                  <h2 id="form-controls-title">表单控件与交互字段导出</h2>
+                  <p class="report-section-summary cn-copy" id="form-controls-summary">
+                    这一节用于验证表单导出链路：默认保留静态视觉，开启交互模式后为文本框、下拉框、复选框和单选框生成可填写 PDF 字段；而日期、滑杆、颜色、文件、进度等控件保持静态准确导出。
+                  </p>
+                </div>
+              </div>
+
+              <div class="report-grid report-grid-2">
+                <section class="report-card form-demo-card" divisionDisable>
+                  <h3 id="form-card-text-title">文本与选择类控件</h3>
+                  <div class="form-demo-grid">
+                    <label class="form-demo-field">
+                      <span id="form-label-project">项目名称</span>
+                      <input type="text" value="Urban Renewal Pilot 2026" placeholder="输入项目名称">
+                    </label>
+                    <label class="form-demo-field">
+                      <span id="form-label-owner">负责人</span>
+                      <input type="search" value="Luna Chen" placeholder="搜索负责人">
+                    </label>
+                    <label class="form-demo-field">
+                      <span id="form-label-email">通知邮箱</span>
+                      <input type="email" value="pilot@lisky.com.cn" placeholder="name@example.com">
+                    </label>
+                    <label class="form-demo-field">
+                      <span id="form-label-password">审批口令</span>
+                      <input type="password" value="A4-Vector-Only" placeholder="请输入审批口令">
+                    </label>
+                    <label class="form-demo-field">
+                      <span id="form-label-stage">交付阶段</span>
+                      <select>
+                        <option id="form-stage-option-1">方案评审</option>
+                        <option id="form-stage-option-2" selected>预交付验证</option>
+                        <option id="form-stage-option-3">批量发布</option>
+                      </select>
+                    </label>
+                    <label class="form-demo-field">
+                      <span id="form-label-tags">评审标签</span>
+                      <select multiple size="4">
+                        <option id="form-tag-option-1" selected>分页稳定</option>
+                        <option id="form-tag-option-2" selected>文本层正确</option>
+                        <option id="form-tag-option-3">性能回归</option>
+                        <option id="form-tag-option-4" selected>交互字段</option>
+                      </select>
+                    </label>
+                    <label class="form-demo-field form-demo-field-full">
+                      <span id="form-label-notes">导出备注</span>
+                      <textarea rows="4" placeholder="在这里填写多行备注">请重点核对以下三项：
+1. placeholder 与 value 是否正确切换
+2. checkbox / radio 是否保留当前状态
+3. interactive / hybrid 模式下字段是否可编辑</textarea>
+                    </label>
+                    <label class="form-demo-field">
+                      <span id="form-label-readonly">只读编号</span>
+                      <input type="text" value="DOC-2026-07-31-A4" readonly>
+                    </label>
+                    <label class="form-demo-field">
+                      <span id="form-label-disabled">禁用样本</span>
+                      <input type="text" value="已锁定字段" disabled>
+                    </label>
+                  </div>
+                  <div class="report-note cn-copy" id="form-note-text">
+                    该卡片带有 <code>divisionDisable</code>，用于验证靠近分页边界时整组控件不会被拆裂；文本类字段在交互模式下应保持可编辑，在静态模式下则保留当前值与 placeholder 外观。
+                  </div>
+                </section>
+
+                <section class="report-card form-demo-card">
+                  <h3 id="form-card-state-title">状态类与静态降级控件</h3>
+                  <div class="form-demo-stack">
+                    <div class="form-demo-row">
+                      <span class="form-demo-row-title" id="form-row-checks">勾选状态</span>
+                      <label class="form-check-chip"><input type="checkbox" checked><span id="form-checkbox-1">已完成回归</span></label>
+                      <label class="form-check-chip"><input type="checkbox"><span id="form-checkbox-2">需要人工复核</span></label>
+                    </div>
+                    <div class="form-demo-row">
+                      <span class="form-demo-row-title" id="form-row-radio">发布通道</span>
+                      <label class="form-check-chip"><input type="radio" name="release-track"><span id="form-radio-1">Canary</span></label>
+                      <label class="form-check-chip"><input type="radio" name="release-track" checked><span id="form-radio-2">Stable</span></label>
+                    </div>
+                    <div class="form-demo-grid">
+                      <label class="form-demo-field">
+                        <span id="form-label-date">验收日期</span>
+                        <input type="date" value="2026-07-31">
+                      </label>
+                      <label class="form-demo-field">
+                        <span id="form-label-time">验收时间</span>
+                        <input type="time" value="14:30">
+                      </label>
+                      <label class="form-demo-field">
+                        <span id="form-label-month">归档月份</span>
+                        <input type="month" value="2026-07">
+                      </label>
+                      <label class="form-demo-field">
+                        <span id="form-label-week">排期周</span>
+                        <input type="week" value="2026-W31">
+                      </label>
+                      <label class="form-demo-field">
+                        <span id="form-label-datetime">冻结时间</span>
+                        <input type="datetime-local" value="2026-07-31T18:45">
+                      </label>
+                      <label class="form-demo-field">
+                        <span id="form-label-range">风险阈值</span>
+                        <input type="range" min="0" max="100" value="72">
+                      </label>
+                      <label class="form-demo-field">
+                        <span id="form-label-color">主题色</span>
+                        <input type="color" value="#2563eb">
+                      </label>
+                      <label class="form-demo-field">
+                        <span id="form-label-file">附件上传</span>
+                        <input type="file" multiple>
+                      </label>
+                    </div>
+                    <div class="form-meter-grid">
+                      <label class="form-demo-field">
+                        <span id="form-label-progress">导出进度</span>
+                        <progress value="68" max="100"></progress>
+                      </label>
+                      <label class="form-demo-field">
+                        <span id="form-label-meter">质量评分</span>
+                        <meter min="0" max="100" low="60" high="85" optimum="92" value="88"></meter>
+                      </label>
+                    </div>
+                  </div>
+                  <div class="report-note cn-copy" id="form-note-state">
+                    `range / color / file / progress / meter` 会保留静态准确外观，但不会生成损坏的交互字段；checkbox / radio 则应在交互 PDF 中继续可切换。
+                  </div>
+                </section>
+              </div>
+            </section>
+
+            <section class="report-section">
+              <div class="report-section-head">
+                <div class="report-section-index">08</div>
                 <div>
                   <div class="report-section-kicker">Pagination</div>
                   <h2>分页压力测试与附录</h2>

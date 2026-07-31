@@ -11,6 +11,96 @@ import { BinWriter } from './format';
 import { resolvePageSize } from './pageSizes';
 import { base64ToBytes } from './wasm-glue';
 
+// #region debug-point A-E:pdf-gen-slow-instrumentation
+type DebugPerfSnapshotState = {
+  startedAt: number;
+  strategyVector: number;
+  strategyBackgroundRaster: number;
+  strategyFullRaster: number;
+  resolveBackdropColorCalls: number;
+  resolveBackdropColorMs: number;
+  resolveBackdropImageCalls: number;
+  resolveBackdropImageMs: number;
+  resolveBackdropAncestorScans: number;
+  rasterBgCalls: number;
+  rasterBgMs: number;
+  rasterBgDepth: number;
+  rasterBgMaxDepth: number;
+  rasterBgCacheHits: number;
+  rasterBgCacheMisses: number;
+  rasterFullCalls: number;
+  rasterFullMs: number;
+};
+
+type RasterRgbResult = { bytes: Uint8Array; width: number; height: number; format: number } | null;
+
+type DebugPerfState = {
+  snapshot: DebugPerfSnapshotState;
+  backdropRasterCache: WeakMap<HTMLElement, Promise<RasterRgbResult>>;
+};
+
+function debugPerfFreshSnapshotState(): DebugPerfSnapshotState {
+  return {
+    startedAt: performance.now(),
+    strategyVector: 0,
+    strategyBackgroundRaster: 0,
+    strategyFullRaster: 0,
+    resolveBackdropColorCalls: 0,
+    resolveBackdropColorMs: 0,
+    resolveBackdropImageCalls: 0,
+    resolveBackdropImageMs: 0,
+    resolveBackdropAncestorScans: 0,
+    rasterBgCalls: 0,
+    rasterBgMs: 0,
+    rasterBgDepth: 0,
+    rasterBgMaxDepth: 0,
+    rasterBgCacheHits: 0,
+    rasterBgCacheMisses: 0,
+    rasterFullCalls: 0,
+    rasterFullMs: 0,
+  };
+}
+
+function getDebugPerfState(): DebugPerfState {
+  const key = '__dompdfDebugPerfState__';
+  const g = globalThis as typeof globalThis & { [key: string]: DebugPerfState | undefined };
+  if (!g[key]) {
+    g[key] = {
+      snapshot: debugPerfFreshSnapshotState(),
+      backdropRasterCache: new WeakMap<HTMLElement, Promise<RasterRgbResult>>(),
+    };
+  }
+  return g[key] as DebugPerfState;
+}
+
+function resetDebugPerfSnapshotState(): void {
+  const state = getDebugPerfState();
+  state.snapshot = debugPerfFreshSnapshotState();
+  state.backdropRasterCache = new WeakMap<HTMLElement, Promise<RasterRgbResult>>();
+}
+
+function postDebugPerfEvent(
+  hypothesisId: 'A' | 'B' | 'C' | 'D' | 'E',
+  location: string,
+  msg: string,
+  data: Record<string, unknown>,
+): void {
+  fetch('http://127.0.0.1:7777/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'pdf-gen-slow',
+      runId: 'pre-fix',
+      hypothesisId,
+      location,
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+}
+// #endregion
+
 // ---- public option types (dompdf.js-aligned) ----
 
 export interface FontConfig {
@@ -99,6 +189,26 @@ export interface ExportProgress {
   stage: ExportProgressStage;
   totalPages?: number;
   currentPage?: number;
+}
+
+export type FormMode = 'static' | 'interactive' | 'hybrid';
+
+export type FormInclude =
+  | 'text'
+  | 'textarea'
+  | 'select'
+  | 'checkbox'
+  | 'radio'
+  | 'date-time'
+  | 'range'
+  | 'color'
+  | 'file'
+  | 'progress'
+  | 'meter';
+
+export interface FormOptions {
+  mode?: FormMode;
+  include?: FormInclude[];
 }
 
 export interface PdfEncryptionOptions {
@@ -234,6 +344,7 @@ function normalizeLegacyOptions(options: ExportOptions = {}): NormalizedExportOp
     ...options,
     fontConfig: arrayifyFontConfig(options.fontConfig),
     langFontConfig: arrayifyFontConfig(options.langFontConfig),
+    form: normalizeFormOptions(options.form),
   };
 
   if (options.allowTaint !== undefined) {
@@ -372,6 +483,8 @@ export interface ExportOptions {
   windowWidth?: number;
   /** Legacy window options, accepted for compatibility. */
   windowHeight?: number;
+  /** Form export behavior. Defaults to static rendering. */
+  form?: boolean | FormOptions;
 
   // ---- advanced pt-level overrides (take precedence over format/margins) ----
   pageWidthPt?: number;
@@ -381,10 +494,17 @@ export interface ExportOptions {
   jpegQuality?: number;
 }
 
-interface NormalizedExportOptions extends ExportOptions {
+interface NormalizedFormOptions {
+  mode: FormMode;
+  include: FormInclude[];
+  includeSet: Set<FormInclude>;
+}
+
+interface NormalizedExportOptions extends Omit<ExportOptions, 'form'> {
   fontConfig?: FontConfig[];
   langFontConfig?: FontConfig[];
   encryption?: PdfEncryptionOptions;
+  form: NormalizedFormOptions;
 }
 
 interface FontOverride {
@@ -399,6 +519,60 @@ const VALID_ENCRYPTION_PERMISSIONS: ReadonlySet<EncryptionPermission> = new Set(
   'modify',
   'print',
 ]);
+
+const DEFAULT_FORM_INCLUDE: readonly FormInclude[] = [
+  'text',
+  'textarea',
+  'select',
+  'checkbox',
+  'radio',
+  'date-time',
+  'range',
+  'color',
+  'file',
+  'progress',
+  'meter',
+];
+
+function normalizeFormInclude(value: string): FormInclude | null {
+  switch (value) {
+    case 'text':
+    case 'textarea':
+    case 'select':
+    case 'checkbox':
+    case 'radio':
+    case 'date-time':
+    case 'range':
+    case 'color':
+    case 'file':
+    case 'progress':
+    case 'meter':
+      return value;
+    default:
+      return null;
+  }
+}
+
+function normalizeFormOptions(form: boolean | FormOptions | undefined): NormalizedFormOptions {
+  if (form == null || form === false || form === true) {
+    const include = [...DEFAULT_FORM_INCLUDE];
+    return {
+      mode: 'static',
+      include,
+      includeSet: new Set(include),
+    };
+  }
+  const mode: FormMode = form.mode === 'interactive' || form.mode === 'hybrid' ? form.mode : 'static';
+  const include = (form.include ?? DEFAULT_FORM_INCLUDE)
+    .map((entry) => normalizeFormInclude(entry))
+    .filter((entry): entry is FormInclude => entry !== null);
+  const normalizedInclude = include.length > 0 ? include : [...DEFAULT_FORM_INCLUDE];
+  return {
+    mode,
+    include: normalizedInclude,
+    includeSet: new Set(normalizedInclude),
+  };
+}
 
 export function normalizeEncryptionOptions(
   encryption?: PdfEncryptionOptions,
@@ -497,6 +671,33 @@ interface CollectedFont {
   bytes: Uint8Array;
 }
 
+interface CollectedFormFieldOption {
+  label: string;
+  value: string;
+  selected: boolean;
+}
+
+interface CollectedFormField {
+  id: number;
+  nodeId: number;
+  kind: number;
+  interactiveKind: number;
+  name: string;
+  value: string;
+  defaultValue: string;
+  placeholder: string;
+  checked: boolean;
+  disabled: boolean;
+  readonly: boolean;
+  required: boolean;
+  multiple: boolean;
+  placeholderShown: boolean;
+  password: boolean;
+  textAlign: number;
+  padding: [number, number, number, number];
+  options: CollectedFormFieldOption[];
+}
+
 interface LineBox {
   x: number;
   y: number;
@@ -584,6 +785,363 @@ const F_RENDER_MODE = 0x80;
 const F_DIVISION_DISABLE = 0x100;
 const F_PAGE_BREAK = 0x200;
 const F_SHADOW = 0x400;
+
+const FORM_FIELD_KIND_TEXT = 1;
+const FORM_FIELD_KIND_TEXTAREA = 2;
+const FORM_FIELD_KIND_SELECT = 3;
+const FORM_FIELD_KIND_CHECKBOX = 4;
+const FORM_FIELD_KIND_RADIO = 5;
+const FORM_FIELD_KIND_DATE_TIME = 6;
+const FORM_FIELD_KIND_RANGE = 7;
+const FORM_FIELD_KIND_COLOR = 8;
+const FORM_FIELD_KIND_FILE = 9;
+const FORM_FIELD_KIND_PROGRESS = 10;
+const FORM_FIELD_KIND_METER = 11;
+
+const FORM_INTERACTIVE_NONE = 0;
+const FORM_INTERACTIVE_TEXT = 1;
+const FORM_INTERACTIVE_CHOICE = 2;
+const FORM_INTERACTIVE_CHECKBOX = 3;
+const FORM_INTERACTIVE_RADIO = 4;
+
+const FORM_FLAG_CHECKED = 0x01;
+const FORM_FLAG_DISABLED = 0x02;
+const FORM_FLAG_READONLY = 0x04;
+const FORM_FLAG_REQUIRED = 0x08;
+const FORM_FLAG_MULTIPLE = 0x10;
+const FORM_FLAG_PLACEHOLDER_SHOWN = 0x20;
+const FORM_FLAG_PASSWORD = 0x40;
+
+interface FormControlAnalysis {
+  kind: number;
+  interactiveKind: number;
+  name: string;
+  value: string;
+  defaultValue: string;
+  placeholder: string;
+  checked: boolean;
+  disabled: boolean;
+  readonly: boolean;
+  required: boolean;
+  multiple: boolean;
+  placeholderShown: boolean;
+  password: boolean;
+  textAlign: number;
+  padding: [number, number, number, number];
+  options: CollectedFormFieldOption[];
+  hiddenText: string;
+}
+
+function normalizeInputType(type: string | null | undefined): string {
+  return (type || 'text').trim().toLowerCase() || 'text';
+}
+
+function isDateTimeInputType(type: string): boolean {
+  return type === 'date'
+    || type === 'time'
+    || type === 'month'
+    || type === 'week'
+    || type === 'datetime-local';
+}
+
+function formIncludeForInputType(type: string): FormInclude | null {
+  if (type === 'checkbox') return 'checkbox';
+  if (type === 'radio') return 'radio';
+  if (isDateTimeInputType(type)) return 'date-time';
+  if (type === 'range') return 'range';
+  if (type === 'color') return 'color';
+  if (type === 'file') return 'file';
+  return 'text';
+}
+
+function shouldEmitStaticFormVisual(
+  form: NormalizedFormOptions,
+  interactiveKind: number,
+): boolean {
+  return form.mode !== 'interactive' || interactiveKind === FORM_INTERACTIVE_NONE;
+}
+
+function shouldEmitInteractiveFormField(
+  form: NormalizedFormOptions,
+  interactiveKind: number,
+): boolean {
+  return form.mode !== 'static' && interactiveKind !== FORM_INTERACTIVE_NONE;
+}
+
+function isTextualFormKind(kind: number): boolean {
+  return kind === FORM_FIELD_KIND_TEXT
+    || kind === FORM_FIELD_KIND_TEXTAREA
+    || kind === FORM_FIELD_KIND_SELECT
+    || kind === FORM_FIELD_KIND_DATE_TIME;
+}
+
+function shouldRasterizeStaticFormControl(kind: number): boolean {
+  return kind === FORM_FIELD_KIND_CHECKBOX
+    || kind === FORM_FIELD_KIND_RADIO
+    || kind === FORM_FIELD_KIND_RANGE
+    || kind === FORM_FIELD_KIND_COLOR
+    || kind === FORM_FIELD_KIND_FILE
+    || kind === FORM_FIELD_KIND_PROGRESS
+    || kind === FORM_FIELD_KIND_METER;
+}
+
+function shouldSuppressBaseNodeForInteractiveField(kind: number): boolean {
+  return kind === FORM_FIELD_KIND_CHECKBOX || kind === FORM_FIELD_KIND_RADIO;
+}
+
+function collectSelectOptions(select: HTMLSelectElement): CollectedFormFieldOption[] {
+  return Array.from(select.options).map((option) => ({
+    label: option.text,
+    value: option.value,
+    selected: option.selected,
+  }));
+}
+
+function analyzeFormControl(
+  el: HTMLElement,
+  cs: CSSStyleDeclaration,
+  form: NormalizedFormOptions,
+): FormControlAnalysis | null {
+  const textAlign = alignNum(cs.textAlign);
+  const padding: [number, number, number, number] = [
+    parseFloat(cs.paddingTop) || 0,
+    parseFloat(cs.paddingRight) || 0,
+    parseFloat(cs.paddingBottom) || 0,
+    parseFloat(cs.paddingLeft) || 0,
+  ];
+  if (el instanceof HTMLInputElement) {
+    const type = normalizeInputType(el.type);
+    const include = formIncludeForInputType(type);
+    if (!include || !form.includeSet.has(include)) return null;
+    if (type === 'checkbox') {
+      return {
+        kind: FORM_FIELD_KIND_CHECKBOX,
+        interactiveKind: FORM_INTERACTIVE_CHECKBOX,
+        name: el.name || '',
+        value: el.checked ? 'Yes' : 'Off',
+        defaultValue: el.defaultChecked ? 'Yes' : 'Off',
+        placeholder: '',
+        checked: el.checked,
+        disabled: el.disabled,
+        readonly: false,
+        required: el.required,
+        multiple: false,
+        placeholderShown: false,
+        password: false,
+        textAlign,
+        padding,
+        options: [],
+        hiddenText: '',
+      };
+    }
+    if (type === 'radio') {
+      return {
+        kind: FORM_FIELD_KIND_RADIO,
+        interactiveKind: FORM_INTERACTIVE_RADIO,
+        name: el.name || '',
+        value: el.value || `radio-${el.id || 'option'}`,
+        defaultValue: el.defaultChecked ? (el.value || `radio-${el.id || 'option'}`) : '',
+        placeholder: '',
+        checked: el.checked,
+        disabled: el.disabled,
+        readonly: false,
+        required: el.required,
+        multiple: false,
+        placeholderShown: false,
+        password: false,
+        textAlign,
+        padding,
+        options: [],
+        hiddenText: '',
+      };
+    }
+    if (type === 'range') {
+      return {
+        kind: FORM_FIELD_KIND_RANGE,
+        interactiveKind: FORM_INTERACTIVE_NONE,
+        name: el.name || '',
+        value: el.value,
+        defaultValue: el.defaultValue,
+        placeholder: '',
+        checked: false,
+        disabled: el.disabled,
+        readonly: false,
+        required: el.required,
+        multiple: false,
+        placeholderShown: false,
+        password: false,
+        textAlign,
+        padding,
+        options: [],
+        hiddenText: el.value,
+      };
+    }
+    if (type === 'color') {
+      return {
+        kind: FORM_FIELD_KIND_COLOR,
+        interactiveKind: FORM_INTERACTIVE_NONE,
+        name: el.name || '',
+        value: el.value,
+        defaultValue: el.defaultValue,
+        placeholder: '',
+        checked: false,
+        disabled: el.disabled,
+        readonly: false,
+        required: el.required,
+        multiple: false,
+        placeholderShown: false,
+        password: false,
+        textAlign,
+        padding,
+        options: [],
+        hiddenText: el.value,
+      };
+    }
+    if (type === 'file') {
+      const fileNames = el.files ? Array.from(el.files).map((file) => file.name) : [];
+      return {
+        kind: FORM_FIELD_KIND_FILE,
+        interactiveKind: FORM_INTERACTIVE_NONE,
+        name: el.name || '',
+        value: fileNames.join('\n'),
+        defaultValue: '',
+        placeholder: '',
+        checked: false,
+        disabled: el.disabled,
+        readonly: false,
+        required: el.required,
+        multiple: el.multiple,
+        placeholderShown: false,
+        password: false,
+        textAlign,
+        padding,
+        options: [],
+        hiddenText: fileNames.join('\n'),
+      };
+    }
+    const placeholder = el.placeholder || '';
+    const value = el.value || '';
+    const placeholderShown = value.length === 0 && placeholder.length > 0;
+    const password = type === 'password';
+    return {
+      kind: isDateTimeInputType(type) ? FORM_FIELD_KIND_DATE_TIME : FORM_FIELD_KIND_TEXT,
+      interactiveKind: FORM_INTERACTIVE_TEXT,
+      name: el.name || '',
+      value,
+      defaultValue: el.defaultValue,
+      placeholder,
+      checked: false,
+      disabled: el.disabled,
+      readonly: el.readOnly,
+      required: el.required,
+      multiple: false,
+      placeholderShown,
+      password,
+      textAlign,
+      padding,
+      options: [],
+      hiddenText: placeholderShown
+        ? placeholder
+        : password
+          ? '•'.repeat(Array.from(value).length)
+          : value,
+    };
+  }
+  if (el instanceof HTMLTextAreaElement) {
+    if (!form.includeSet.has('textarea')) return null;
+    const placeholder = el.placeholder || '';
+    const value = el.value || '';
+    const placeholderShown = value.length === 0 && placeholder.length > 0;
+    return {
+      kind: FORM_FIELD_KIND_TEXTAREA,
+      interactiveKind: FORM_INTERACTIVE_TEXT,
+      name: el.name || '',
+      value,
+      defaultValue: el.defaultValue,
+      placeholder,
+      checked: false,
+      disabled: el.disabled,
+      readonly: el.readOnly,
+      required: el.required,
+      multiple: true,
+      placeholderShown,
+      password: false,
+      textAlign,
+      padding,
+      options: [],
+      hiddenText: placeholderShown ? placeholder : value,
+    };
+  }
+  if (el instanceof HTMLSelectElement) {
+    if (!form.includeSet.has('select')) return null;
+    const options = collectSelectOptions(el);
+    const selectedOptions = options.filter((option) => option.selected);
+    return {
+      kind: FORM_FIELD_KIND_SELECT,
+      interactiveKind: FORM_INTERACTIVE_CHOICE,
+      name: el.name || '',
+      value: selectedOptions.map((option) => option.value).join('\n'),
+      defaultValue: Array.from(el.options).filter((option) => option.defaultSelected).map((option) => option.value).join('\n'),
+      placeholder: '',
+      checked: false,
+      disabled: el.disabled,
+      readonly: false,
+      required: el.required,
+      multiple: el.multiple,
+      placeholderShown: false,
+      password: false,
+      textAlign,
+      padding,
+      options,
+      hiddenText: selectedOptions.map((option) => option.label).join('\n'),
+    };
+  }
+  if (el instanceof HTMLProgressElement) {
+    if (!form.includeSet.has('progress')) return null;
+    return {
+      kind: FORM_FIELD_KIND_PROGRESS,
+      interactiveKind: FORM_INTERACTIVE_NONE,
+      name: el.getAttribute('name') || '',
+      value: String(el.value),
+      defaultValue: String(el.value),
+      placeholder: '',
+      checked: false,
+      disabled: false,
+      readonly: true,
+      required: false,
+      multiple: false,
+      placeholderShown: false,
+      password: false,
+      textAlign,
+      padding,
+      options: [],
+      hiddenText: `${el.value}/${el.max || 1}`,
+    };
+  }
+  if (el instanceof HTMLMeterElement) {
+    if (!form.includeSet.has('meter')) return null;
+    return {
+      kind: FORM_FIELD_KIND_METER,
+      interactiveKind: FORM_INTERACTIVE_NONE,
+      name: el.getAttribute('name') || '',
+      value: String(el.value),
+      defaultValue: String(el.value),
+      placeholder: '',
+      checked: false,
+      disabled: false,
+      readonly: true,
+      required: false,
+      multiple: false,
+      placeholderShown: false,
+      password: false,
+      textAlign,
+      padding,
+      options: [],
+      hiddenText: `${el.value}`,
+    };
+  }
+  return null;
+}
 
 // header/footer position enum (must match Rust HFSpec.position)
 function positionNum(p: ContentPosition | undefined): number {
@@ -1422,57 +1980,96 @@ function buildRasterWrapper(
 }
 
 async function resolveBackdropImage(el: HTMLElement, rawRect: DOMRect): Promise<string | null> {
-  for (let cur: HTMLElement | null = el.parentElement; cur; cur = cur.parentElement) {
-    if (!hasComplexBackdropVisual(cur)) continue;
-    const ancestorRect = cur.getBoundingClientRect();
-    if (ancestorRect.width <= 0 || ancestorRect.height <= 0) continue;
-    const raster = await rasterizeElementBackgroundOnly(cur, ancestorRect, findOpaqueBackdropColor(cur));
-    if (!raster) continue;
-    const scaleX = raster.width / Math.max(1, Math.ceil(ancestorRect.width));
-    const scaleY = raster.height / Math.max(1, Math.ceil(ancestorRect.height));
-    const relX = Math.max(0, rawRect.left - ancestorRect.left);
-    const relY = Math.max(0, rawRect.top - ancestorRect.top);
-    const dataUrl = cropRawRgbToDataUrl(
-      raster.bytes,
-      raster.width,
-      raster.height,
-      relX * scaleX,
-      relY * scaleY,
-      Math.max(1, rawRect.width * scaleX),
-      Math.max(1, rawRect.height * scaleY),
-    );
-    if (dataUrl) return dataUrl;
+  const stats = getDebugPerfState().snapshot;
+  const startedAt = performance.now();
+  let scanned = 0;
+  try {
+    for (let cur: HTMLElement | null = el.parentElement; cur; cur = cur.parentElement) {
+      scanned += 1;
+      if (!hasComplexBackdropVisual(cur)) continue;
+      const ancestorRect = cur.getBoundingClientRect();
+      if (ancestorRect.width <= 0 || ancestorRect.height <= 0) continue;
+      const raster = await getCachedBackdropRaster(cur, findOpaqueBackdropColor(cur));
+      if (!raster) continue;
+      const scaleX = raster.width / Math.max(1, Math.ceil(ancestorRect.width));
+      const scaleY = raster.height / Math.max(1, Math.ceil(ancestorRect.height));
+      const relX = Math.max(0, rawRect.left - ancestorRect.left);
+      const relY = Math.max(0, rawRect.top - ancestorRect.top);
+      const dataUrl = cropRawRgbToDataUrl(
+        raster.bytes,
+        raster.width,
+        raster.height,
+        relX * scaleX,
+        relY * scaleY,
+        Math.max(1, rawRect.width * scaleX),
+        Math.max(1, rawRect.height * scaleY),
+      );
+      if (dataUrl) return dataUrl;
+    }
+    return null;
+  } finally {
+    stats.resolveBackdropImageCalls += 1;
+    stats.resolveBackdropImageMs += performance.now() - startedAt;
+    stats.resolveBackdropAncestorScans += scanned;
   }
-  return null;
+}
+
+async function getCachedBackdropRaster(
+  el: HTMLElement,
+  backdropCss?: string,
+): Promise<RasterRgbResult> {
+  const state = getDebugPerfState();
+  const cached = state.backdropRasterCache.get(el);
+  if (cached) {
+    state.snapshot.rasterBgCacheHits += 1;
+    return cached;
+  }
+  state.snapshot.rasterBgCacheMisses += 1;
+  const rect = el.getBoundingClientRect();
+  const promise = rect.width <= 0 || rect.height <= 0
+    ? Promise.resolve(null)
+    : rasterizeElementBackgroundOnly(el, rect, backdropCss, false);
+  state.backdropRasterCache.set(el, promise);
+  return promise;
 }
 
 async function resolveBackdropColor(
   el: HTMLElement,
   rawRect: DOMRect,
 ): Promise<[number, number, number, number]> {
-  for (let cur: HTMLElement | null = el.parentElement; cur; cur = cur.parentElement) {
-    if (!hasComplexBackdropVisual(cur)) continue;
-    const ancestorRect = cur.getBoundingClientRect();
-    if (ancestorRect.width <= 0 || ancestorRect.height <= 0) continue;
-    const raster = await rasterizeElementBackgroundOnly(cur, ancestorRect, findOpaqueBackdropColor(cur));
-    if (!raster) continue;
-    const scaleX = raster.width / Math.max(1, Math.ceil(ancestorRect.width));
-    const scaleY = raster.height / Math.max(1, Math.ceil(ancestorRect.height));
-    const relX = Math.max(0, rawRect.left - ancestorRect.left);
-    const relY = Math.max(0, rawRect.top - ancestorRect.top);
-    const inset = 0.25;
-    const sample = sampleRawRgbRegion(
-      raster.bytes,
-      raster.width,
-      raster.height,
-      (relX + rawRect.width * inset) * scaleX,
-      (relY + rawRect.height * inset) * scaleY,
-      Math.max(1, rawRect.width * (1 - inset * 2) * scaleX),
-      Math.max(1, rawRect.height * (1 - inset * 2) * scaleY),
-    );
-    if (sample) return sample;
+  const stats = getDebugPerfState().snapshot;
+  const startedAt = performance.now();
+  let scanned = 0;
+  try {
+    for (let cur: HTMLElement | null = el.parentElement; cur; cur = cur.parentElement) {
+      scanned += 1;
+      if (!hasComplexBackdropVisual(cur)) continue;
+      const ancestorRect = cur.getBoundingClientRect();
+      if (ancestorRect.width <= 0 || ancestorRect.height <= 0) continue;
+      const raster = await getCachedBackdropRaster(cur, findOpaqueBackdropColor(cur));
+      if (!raster) continue;
+      const scaleX = raster.width / Math.max(1, Math.ceil(ancestorRect.width));
+      const scaleY = raster.height / Math.max(1, Math.ceil(ancestorRect.height));
+      const relX = Math.max(0, rawRect.left - ancestorRect.left);
+      const relY = Math.max(0, rawRect.top - ancestorRect.top);
+      const inset = 0.25;
+      const sample = sampleRawRgbRegion(
+        raster.bytes,
+        raster.width,
+        raster.height,
+        (relX + rawRect.width * inset) * scaleX,
+        (relY + rawRect.height * inset) * scaleY,
+        Math.max(1, rawRect.width * (1 - inset * 2) * scaleX),
+        Math.max(1, rawRect.height * (1 - inset * 2) * scaleY),
+      );
+      if (sample) return sample;
+    }
+    return parseColor(findOpaqueBackdropColor(el));
+  } finally {
+    stats.resolveBackdropColorCalls += 1;
+    stats.resolveBackdropColorMs += performance.now() - startedAt;
+    stats.resolveBackdropAncestorScans += scanned;
   }
-  return parseColor(findOpaqueBackdropColor(el));
 }
 
 async function rasterizeElement(
@@ -1481,12 +2078,21 @@ async function rasterizeElement(
   _quality: number,
   cs: CSSStyleDeclaration,
 ): Promise<{ bytes: Uint8Array; width: number; height: number; format: number; cssWidth: number; cssHeight: number; rawLeft: number; rawTop: number } | null> {
+  const stats = getDebugPerfState().snapshot;
+  const startedAt = performance.now();
   try {
     const shadowPad = computeBoxShadowPadding(cs.boxShadow);
     const captureWidth = Math.max(1, Math.ceil(rawRect.width + shadowPad.left + shadowPad.right));
     const captureHeight = Math.max(1, Math.ceil(rawRect.height + shadowPad.top + shadowPad.bottom));
-    const backdropCss = colorToCssRgb(await resolveBackdropColor(el, rawRect));
-    const backdropImageUrl = await resolveBackdropImage(el, rawRect);
+    const backdropFilter = (cs.getPropertyValue('backdrop-filter') || cs.getPropertyValue('-webkit-backdrop-filter') || '').trim();
+    const bg = parseColor(cs.backgroundColor);
+    const needsBackdropColorSample = bg[3] > 0.001 && bg[3] < 1;
+    const backdropCss = needsBackdropColorSample
+      ? colorToCssRgb(await resolveBackdropColor(el, rawRect))
+      : findOpaqueBackdropColor(el);
+    const backdropImageUrl = backdropFilter && backdropFilter !== 'none'
+      ? await resolveBackdropImage(el, rawRect)
+      : null;
     const wrapper = buildRasterWrapper(el, rawRect, shadowPad, captureWidth, captureHeight, false, backdropCss, backdropImageUrl ?? undefined);
     const out = await rasterizeWrapper(wrapper, captureWidth, captureHeight);
     if (!out) return null;
@@ -1501,6 +2107,9 @@ async function rasterizeElement(
     };
   } catch {
     return null;
+  } finally {
+    stats.rasterFullCalls += 1;
+    stats.rasterFullMs += performance.now() - startedAt;
   }
 }
 
@@ -1512,18 +2121,32 @@ async function rasterizeElementBackgroundOnly(
   el: HTMLElement,
   rawRect: DOMRect,
   backdropCss?: string,
+  allowBackdropSampling = true,
 ): Promise<{ bytes: Uint8Array; width: number; height: number; format: number } | null> {
+  const stats = getDebugPerfState().snapshot;
+  const startedAt = performance.now();
+  stats.rasterBgCalls += 1;
+  stats.rasterBgDepth += 1;
+  stats.rasterBgMaxDepth = Math.max(stats.rasterBgMaxDepth, stats.rasterBgDepth);
   try {
     // No shadow padding: box-shadow is painted vectorially by the box node.
     const captureWidth = Math.max(1, Math.ceil(rawRect.width));
     const captureHeight = Math.max(1, Math.ceil(rawRect.height));
     const noPad: EdgePadding = { top: 0, right: 0, bottom: 0, left: 0 };
-    const resolvedBackdrop = backdropCss || colorToCssRgb(await resolveBackdropColor(el, rawRect));
-    const backdropImageUrl = await resolveBackdropImage(el, rawRect);
+    const resolvedBackdrop = backdropCss
+      || (allowBackdropSampling
+        ? colorToCssRgb(await resolveBackdropColor(el, rawRect))
+        : findOpaqueBackdropColor(el));
+    const backdropImageUrl = allowBackdropSampling
+      ? await resolveBackdropImage(el, rawRect)
+      : null;
     const wrapper = buildRasterWrapper(el, rawRect, noPad, captureWidth, captureHeight, true, resolvedBackdrop, backdropImageUrl ?? undefined);
     return await rasterizeWrapper(wrapper, captureWidth, captureHeight);
   } catch {
     return null;
+  } finally {
+    stats.rasterBgDepth -= 1;
+    stats.rasterBgMs += performance.now() - startedAt;
   }
 }
 
@@ -2280,6 +2903,7 @@ export async function collectSnapshotData(
   root: HTMLElement,
   options: ExportOptions = {},
 ): Promise<EncodeArgs> {
+  resetDebugPerfSnapshotState();
   const normalizedOptions = normalizeLegacyOptions(options);
   // jsPDF hooks: accepted but no-op (engine has no jsPDF instance).
   if (normalizedOptions.onJspdfReady) {
@@ -2360,6 +2984,7 @@ export async function collectSnapshotData(
   const layoutScale = computeLayoutScale(rootRect.width, pageWidthPt, mLeft, mRight);
 
   const nodes: NodeRec[] = [];
+  const formFields: CollectedFormField[] = [];
   const range = document.createRange();
 
   function docRect(r: DOMRect): { x: number; y: number; w: number; h: number } {
@@ -2477,6 +3102,19 @@ export async function collectSnapshotData(
     const text = textNode.data.slice(start16, end16);
     if (!text) return [];
     return linesFromFragments(text, start16, collectTextFragments(textNode, start16, end16));
+  }
+
+  function findFirstTextFragmentX(el: HTMLElement): number | null {
+    const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let node = walker.nextNode() as Text | null;
+    while (node) {
+      if (node.data && node.data.trim().length > 0) {
+        const fragments = collectTextFragments(node);
+        if (fragments.length > 0) return fragments[0].x;
+      }
+      node = walker.nextNode() as Text | null;
+    }
+    return null;
   }
 
   function buildInlineRuns(text: string): InlineRun[] {
@@ -2743,6 +3381,93 @@ function buildInlineRunsWithLangFont(
     });
   }
 
+  async function appendFormRasterNode(
+    parentId: number,
+    el: HTMLElement,
+    rawRect: DOMRect,
+    cs: CSSStyleDeclaration,
+  ): Promise<void> {
+    const raster = await rasterizeElement(el, rawRect, quality, cs);
+    if (!raster) return;
+    const imageId = images.length + 1;
+    images.push({
+      id: imageId,
+      bytes: raster.bytes,
+      width: raster.width,
+      height: raster.height,
+      format: raster.format,
+    });
+    const rawX = raster.rawLeft + window.scrollX - offX;
+    const rawY = raster.rawTop + window.scrollY - offY;
+    nodes.push({
+      id: nodes.length,
+      parent: parentId,
+      kind: 2,
+      x: rawX * layoutScale,
+      y: rawY * layoutScale,
+      w: raster.cssWidth * layoutScale,
+      h: raster.cssHeight * layoutScale,
+      flags: F_IMAGE,
+      overflowHidden: false,
+      renderMode: 0,
+      divisionDisable: false,
+      pageBreak: false,
+      imageId,
+      objectFit: 0,
+    });
+  }
+
+  function pushFormHiddenText(
+    parentId: number,
+    box: NodeRec,
+    cs: CSSStyleDeclaration,
+    text: string,
+    multiline: boolean,
+  ): void {
+    if (!text) return;
+    const font = makeFont(cs) as NonNullable<NodeRec['font']>;
+    const paddingTop = (parseFloat(cs.paddingTop) || 0) * layoutScale;
+    const paddingRight = (parseFloat(cs.paddingRight) || 0) * layoutScale;
+    const paddingBottom = (parseFloat(cs.paddingBottom) || 0) * layoutScale;
+    const paddingLeft = (parseFloat(cs.paddingLeft) || 0) * layoutScale;
+    const contentX = box.x + paddingLeft;
+    const contentY = box.y + paddingTop;
+    const contentW = Math.max(1, box.w - paddingLeft - paddingRight);
+    const contentH = Math.max(1, box.h - paddingTop - paddingBottom);
+    if (!multiline) {
+      const utf8End = utf8Offsets(text)[text.length];
+      pushTextNode(parentId, font, text, [{
+        x: contentX,
+        y: contentY,
+        w: contentW,
+        h: Math.max(1, Math.min(contentH, font.lineHeightPx)),
+        start: 0,
+        end: utf8End,
+      }], undefined, 3);
+      return;
+    }
+    const utf8 = utf8Offsets(text);
+    const lines: LineBox[] = [];
+    const parts = text.split(/\r\n|\r|\n/);
+    let cursor = 0;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const start = cursor;
+      const end = start + part.length;
+      lines.push({
+        x: contentX,
+        y: contentY + i * font.lineHeightPx,
+        w: contentW,
+        h: Math.max(1, font.lineHeightPx),
+        start: utf8[start],
+        end: utf8[end],
+      });
+      cursor = end;
+      while (cursor < text.length && (text[cursor] === '\r' || text[cursor] === '\n')) cursor += 1;
+    }
+    pushTextNode(parentId, font, text, lines, undefined, 3);
+  }
+
   // Map from row group elements (THEAD/TBODY/TFOOT) to their deferred rowspan cells.
   // Used to fix table rowspan rendering order — see the comment in visit().
   const rowGroupDeferredCells = new Map<HTMLElement, Array<{ cell: HTMLElement }>>();
@@ -2765,6 +3490,10 @@ function buildInlineRunsWithLangFont(
 
     const kind = isImg ? 2 : 0;
     const strategy: RenderStrategy = isImg ? 'vector' : classifyRenderStrategy(el, cs);
+    const stats = getDebugPerfState().snapshot;
+    if (strategy === 'full-raster') stats.strategyFullRaster += 1;
+    else if (strategy === 'background-raster') stats.strategyBackgroundRaster += 1;
+    else stats.strategyVector += 1;
 
     if (strategy === 'full-raster' && r.w > 0 && r.h > 0) {
       const raster = await rasterizeElement(el, rawRect, quality, cs);
@@ -3025,6 +3754,67 @@ function buildInlineRunsWithLangFont(
       }
     }
 
+    const formControl = analyzeFormControl(el, cs, normalizedOptions.form);
+    if (formControl) {
+      if (!node.divisionDisable) {
+        node.divisionDisable = true;
+        node.flags |= F_DIVISION_DISABLE;
+      }
+      const emitInteractive = shouldEmitInteractiveFormField(normalizedOptions.form, formControl.interactiveKind);
+      const emitStaticText = normalizedOptions.form.mode === 'static'
+        && isTextualFormKind(formControl.kind)
+        && formControl.hiddenText.length > 0;
+      const emitStaticRaster = normalizedOptions.form.mode === 'static'
+        && shouldRasterizeStaticFormControl(formControl.kind);
+
+      if (emitInteractive && shouldSuppressBaseNodeForInteractiveField(formControl.kind)) {
+        if (node.renderMode === 0) {
+          node.renderMode = 1;
+          node.flags |= F_RENDER_MODE;
+        }
+      }
+
+      if (emitStaticRaster) {
+        if (node.renderMode === 0) {
+          node.renderMode = 1;
+          node.flags |= F_RENDER_MODE;
+        }
+        await appendFormRasterNode(id, el, rawRect, cs);
+      }
+      if (emitStaticText) {
+        pushFormHiddenText(
+          id,
+          node,
+          cs,
+          formControl.hiddenText,
+          formControl.kind === FORM_FIELD_KIND_TEXTAREA || formControl.multiple,
+        );
+      }
+      if (emitInteractive) {
+        formFields.push({
+          id: formFields.length + 1,
+          nodeId: node.id,
+          kind: formControl.kind,
+          interactiveKind: formControl.interactiveKind,
+          name: formControl.name,
+          value: formControl.value,
+          defaultValue: formControl.defaultValue,
+          placeholder: formControl.placeholder,
+          checked: formControl.checked,
+          disabled: formControl.disabled,
+          readonly: formControl.readonly,
+          required: formControl.required,
+          multiple: formControl.multiple,
+          placeholderShown: formControl.placeholderShown,
+          password: formControl.password,
+          textAlign: formControl.textAlign,
+          padding: formControl.padding,
+          options: formControl.options,
+        });
+      }
+      return;
+    }
+
     // --- ::marker synthesis for <li> ---
     // When a <li> is rendered as vector / background-raster, its ::marker box
     // is NOT a real DOM child (browsers paint it from list-style semantics), so
@@ -3051,9 +3841,12 @@ function buildInlineRunsWithLangFont(
 
           const liDoc = docRect(el.getBoundingClientRect());
           const position = (cs.listStylePosition || 'outside').trim();
+          const listCs = el.parentElement ? getComputedStyle(el.parentElement) : null;
+          const listPaddingLeftPx = listCs ? (parseFloat(listCs.paddingLeft) || 0) : 0;
           const paddingLeftPx = parseFloat(cs.paddingLeft) || 0;
           const markerMarginLeftPx = parseFloat(markerCs.marginLeft) || 0;
           const markerMarginRightPx = parseFloat(markerCs.marginRight) || 0;
+          const markerGapPx = Math.max(4, fontSizePx * 0.33);
 
           // Vertical: align marker cap with the first text line of the <li>.
           // Using liDoc.y + (lineHeight - fontSize)/2 approximates the text
@@ -3061,24 +3854,34 @@ function buildInlineRunsWithLangFont(
           // correct first-line marker because lineHeight matches the first
           // line box height.
           const markerY = liDoc.y + (lineHeightPx - fontSizePx) * 0.5 * layoutScale;
+          const firstTextX = findFirstTextFragmentX(el);
           let markerX: number;
+          let markerW: number;
+          let markerAlign = markerFont.align;
           if (position === 'inside') {
             // Marker flows as the first inline child, so it starts at the
             // padding-left edge of the <li>.
-            markerX = liDoc.x + paddingLeftPx * layoutScale;
+            markerX = firstTextX !== null
+              ? firstTextX - textWidthPx * layoutScale
+              : liDoc.x + paddingLeftPx * layoutScale;
+            markerW = Math.max(1, textWidthPx * layoutScale);
           } else {
-            // Outside: marker sits in the margin to the left of the <li>'s
-            // padding box. marker_right = padding_left - marginRight,
-            // marker_left  = marker_right - textWidth - marginLeft.
-            markerX = liDoc.x
-              + (paddingLeftPx - markerMarginRightPx - markerMarginLeftPx) * layoutScale
-              - textWidthPx * layoutScale;
+            // Outside: reserve the browser-like marker column (usually the
+            // parent list's padding-left) and right-align marker text inside it.
+            const markerRight = firstTextX !== null
+              ? firstTextX - markerGapPx * layoutScale
+              : liDoc.x + (paddingLeftPx - markerMarginRightPx) * layoutScale;
+            const markerColumnPx = Math.max(textWidthPx + markerGapPx, listPaddingLeftPx + markerMarginLeftPx);
+            markerW = Math.max(1, markerColumnPx * layoutScale);
+            markerX = markerRight - markerW;
+            markerAlign = 1;
           }
           const utf8End = utf8Offsets(markerText)[markerText.length];
-          pushTextNode(id, markerFont, markerText, [{
+          const markerFontNode: NonNullable<NodeRec['font']> = { ...markerFont, align: markerAlign };
+          pushTextNode(id, markerFontNode, markerText, [{
             x: markerX,
             y: markerY,
-            w: Math.max(1, textWidthPx * layoutScale),
+            w: markerW,
             h: Math.max(1, fontSizePx * layoutScale),
             start: 0,
             end: utf8End,
@@ -3248,6 +4051,26 @@ function buildInlineRunsWithLangFont(
     }
   }
 
+  const stats = getDebugPerfState().snapshot;
+  postDebugPerfEvent('A', 'src/snapshot.ts:collectSnapshotData', 'snapshot performance summary', {
+    snapshotMs: +(performance.now() - stats.startedAt).toFixed(2),
+    nodeCount: nodes.length,
+    imageCount: images.length,
+    strategyVector: stats.strategyVector,
+    strategyBackgroundRaster: stats.strategyBackgroundRaster,
+    strategyFullRaster: stats.strategyFullRaster,
+    resolveBackdropColorCalls: stats.resolveBackdropColorCalls,
+    resolveBackdropColorMs: +stats.resolveBackdropColorMs.toFixed(2),
+    resolveBackdropImageCalls: stats.resolveBackdropImageCalls,
+    resolveBackdropImageMs: +stats.resolveBackdropImageMs.toFixed(2),
+    resolveBackdropAncestorScans: stats.resolveBackdropAncestorScans,
+    rasterBgCalls: stats.rasterBgCalls,
+    rasterBgMs: +stats.rasterBgMs.toFixed(2),
+    rasterBgMaxDepth: stats.rasterBgMaxDepth,
+    rasterFullCalls: stats.rasterFullCalls,
+    rasterFullMs: +stats.rasterFullMs.toFixed(2),
+  });
+
   return {
     pageWidthPt, pageHeightPt, mTop, mRight, mBottom, mLeft,
     precision, pagination, compress, backgroundColor: normalizedOptions.backgroundColor ?? null,
@@ -3260,7 +4083,7 @@ function buildInlineRunsWithLangFont(
         : await resolveWatermark(normalizedOptions.watermark, images),
     perPageHF: [],
     perPageWatermark: [],
-    fonts, nodes, images,
+    fonts, nodes, formFields, images,
   };
 }
 
@@ -3292,6 +4115,7 @@ export interface EncodeArgs {
   perPageWatermark: (ResolvedWatermark | null)[];
   fonts: CollectedFont[];
   nodes: NodeRec[];
+  formFields: CollectedFormField[];
   images: CollectedImage[];
 }
 
@@ -3352,10 +4176,47 @@ function writeOptWatermark(w: BinWriter, watermark: ResolvedWatermark | null) {
   }
 }
 
+function writeString32(w: BinWriter, value: string): void {
+  const len = BinWriter.utf8Len(value);
+  w.u32(len);
+  w.utf8(value);
+}
+
+function writeFormField(w: BinWriter, field: CollectedFormField): void {
+  let flags = 0;
+  if (field.checked) flags |= FORM_FLAG_CHECKED;
+  if (field.disabled) flags |= FORM_FLAG_DISABLED;
+  if (field.readonly) flags |= FORM_FLAG_READONLY;
+  if (field.required) flags |= FORM_FLAG_REQUIRED;
+  if (field.multiple) flags |= FORM_FLAG_MULTIPLE;
+  if (field.placeholderShown) flags |= FORM_FLAG_PLACEHOLDER_SHOWN;
+  if (field.password) flags |= FORM_FLAG_PASSWORD;
+  w.u32(field.id);
+  w.u32(field.nodeId);
+  w.u8(field.kind);
+  w.u8(field.interactiveKind);
+  w.u8(field.textAlign);
+  w.u16(flags);
+  w.f32(field.padding[0]);
+  w.f32(field.padding[1]);
+  w.f32(field.padding[2]);
+  w.f32(field.padding[3]);
+  writeString32(w, field.name);
+  writeString32(w, field.value);
+  writeString32(w, field.defaultValue);
+  writeString32(w, field.placeholder);
+  w.u32(field.options.length);
+  for (const option of field.options) {
+    writeString32(w, option.label);
+    writeString32(w, option.value);
+    w.u8(option.selected ? 1 : 0);
+  }
+}
+
 function encode(a: EncodeArgs): Uint8Array {
   const w = new BinWriter();
   w.bytes(new Uint8Array([0x44, 0x32, 0x50, 0x31])); // "D2P1"
-  w.u32(10); // version 10 (adds image watermark support)
+  w.u32(12); // version 12 (adds form field padding)
   w.f32(a.pageWidthPt);
   w.f32(a.pageHeightPt);
   w.f32(a.mTop);
@@ -3480,6 +4341,12 @@ function encode(a: EncodeArgs): Uint8Array {
         w.u32(l.start); w.u32(l.end);
       }
     }
+  }
+
+  // Form fields
+  w.u32(a.formFields.length);
+  for (const field of a.formFields) {
+    writeFormField(w, field);
   }
 
   // Images

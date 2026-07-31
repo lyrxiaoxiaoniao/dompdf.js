@@ -121,6 +121,33 @@ await dompdf(document.querySelector('#capture'), {
 - `pageBreak`：在元素前强制分页
 - `excludePage` / `excludePages`：指定哪些页跳过页眉页脚
 
+## 表单导出
+
+使用 `form` 选项控制 HTML 表单控件是仅导出静态外观，还是同时生成可交互的 PDF 表单字段。
+
+```js
+import dompdf from 'dompdf.js';
+
+await dompdf(document.querySelector('#capture'), {
+  pagination: true,
+  form: {
+    mode: 'hybrid',
+    include: ['text', 'textarea', 'select', 'checkbox', 'radio', 'date-time', 'range', 'color', 'file', 'progress', 'meter'],
+  },
+});
+```
+
+- `static`（默认）：保留表单控件当前的静态视觉外观
+- `interactive`：对具备自然 AcroForm 映射的控件生成交互字段
+- `hybrid`：在保留静态视觉的同时附带交互字段
+
+当前映射规则：
+
+- 交互字段：文本类 `input`、`textarea`、`select`、`checkbox`、`radio`
+- 静态降级：`date/time/month/week/datetime-local`、`range`、`color`、`file`、`progress`、`meter`
+
+所有值都以导出开始瞬间的 DOM 当前状态为准。
+
 ## 字体配置
 
 非拉丁文本建议显式嵌入字体。

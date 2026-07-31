@@ -121,6 +121,33 @@ await dompdf(document.querySelector('#capture'), {
 - `pageBreak`: force a new page before an element
 - `excludePage` / `excludePages`: skip header/footer on selected pages
 
+## Form Export
+
+Use the `form` option to control whether HTML form controls are exported as static appearance only or as interactive PDF fields.
+
+```js
+import dompdf from 'dompdf.js';
+
+await dompdf(document.querySelector('#capture'), {
+  pagination: true,
+  form: {
+    mode: 'hybrid',
+    include: ['text', 'textarea', 'select', 'checkbox', 'radio', 'date-time', 'range', 'color', 'file', 'progress', 'meter'],
+  },
+});
+```
+
+- `static` (default): preserve the current visual appearance of form controls in the PDF.
+- `interactive`: emit PDF form fields for controls with a natural AcroForm mapping.
+- `hybrid`: keep static visual fidelity while also emitting interactive fields.
+
+Current mapping:
+
+- Interactive fields: text-like `input`, `textarea`, `select`, `checkbox`, `radio`
+- Static-only fallback: `date/time/month/week/datetime-local`, `range`, `color`, `file`, `progress`, `meter`
+
+All values are exported from the current DOM state at the moment export starts.
+
 ## Font Configuration
 
 For non-Latin text, embed a font explicitly.
