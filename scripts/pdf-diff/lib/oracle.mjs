@@ -322,7 +322,14 @@ export async function collectOracle({
       const hasBorderRadius = borderRadius.some((v) => v > 0.01);
 
       const tag = el.tagName.toUpperCase();
-      const isIcon = tag === 'IMG' || tag === 'SVG'
+      const inputType = tag === 'INPUT' ? (el.getAttribute('type') || 'text').toLowerCase() : '';
+      const isNativeControl = tag === 'INPUT'
+        && (inputType === 'checkbox' || inputType === 'radio')
+        && (style.appearance || style.webkitAppearance || '') !== 'none';
+      const hasMarker = style.display === 'list-item'
+        && (style.listStyleType || '').trim() !== 'none'
+        && (style.listStyleType || '').trim() !== '';
+      const isIcon = isNativeControl || hasMarker || tag === 'IMG' || tag === 'SVG'
         || hasImageLikeBackground(style.backgroundImage)
         || pseudoIsIcon(el, '::before') || pseudoIsIcon(el, '::after');
 

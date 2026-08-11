@@ -1,12 +1,16 @@
 import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createCanvas, DOMMatrix, ImageData, Path2D } from '@napi-rs/canvas';
-import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { roundSize } from './layout.mjs';
 
+// pdfjs-dist's ESM module body calls `new DOMMatrix()` at load time, so the
+// polyfills must be installed BEFORE the dynamic import of pdfjs-dist below.
 if (!globalThis.DOMMatrix) globalThis.DOMMatrix = DOMMatrix;
 if (!globalThis.ImageData) globalThis.ImageData = ImageData;
 if (!globalThis.Path2D) globalThis.Path2D = Path2D;
+
+// Dynamic import ensures pdfjs-dist evaluates after the polyfills are in place.
+const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
 
 class NodeCanvasFactory {
   create(width, height) {
