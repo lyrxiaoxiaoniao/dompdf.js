@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿(function () {
+﻿(function () {
   /* ========================= Globals ========================= */
   var api = window.dompdf;
   var markedApi = window.marked;
@@ -162,45 +162,45 @@
       },
       tableGroups: [
         {
-          group: 'North Region / Urban Renewal',
-          statusText: 'Exceeded',
+          group: 'Foundation / Design Tokens',
+          statusText: 'Stable',
           statusClass: 'is-good',
           rows: [
-            ['$12.4M', '36.2%', '$14.8M', '38.0%'],
-            ['$8.2M', '28.5%', '$9.5M', '30.2%']
+            ['92%', '4.8', '96%', '4.9'],
+            ['88%', '4.6', '91%', '4.7']
           ]
         },
         {
-          group: 'Asia-Pacific / Procurement',
-          statusText: 'On Target',
+          group: 'Components / Web',
+          statusText: 'Stable',
+          statusClass: 'is-good',
+          rows: [
+            ['85%', '4.5', '89%', '4.6'],
+            ['79%', '4.2', '84%', '4.4']
+          ]
+        },
+        {
+          group: 'Components / Mobile',
+          statusText: 'On Track',
           statusClass: 'is-stable',
           rows: [
-            ['$14.1M', '32.8%', '$16.5M', '34.5%'],
-            ['$5.6M', '14.3%', '$6.2M', '15.1%']
+            ['74%', '4.1', '81%', '4.3'],
+            ['68%', '3.9', '75%', '4.1']
           ]
         },
         {
-          group: 'Europe / Compliance Archive',
-          statusText: 'Watch',
+          group: 'Patterns / Layout',
+          statusText: 'Review',
           statusClass: 'is-watch',
           rows: [
-            ['$9.7M', '24.8%', '$10.9M', '26.1%'],
-            ['$4.4M', '11.6%', '$4.9M', '12.2%']
-          ]
-        },
-        {
-          group: 'Public Sector / Delivery Ops',
-          statusText: 'Exceeded',
-          statusClass: 'is-good',
-          rows: [
-            ['$11.3M', '34.7%', '$13.2M', '35.8%'],
-            ['$6.8M', '19.4%', '$7.6M', '20.6%']
+            ['65%', '3.8', '72%', '4.0'],
+            ['58%', '3.6', '66%', '3.8']
           ]
         }
       ],
       longList: {
-        light: 'This lightweight benchmark keeps the appendix intentionally short so you can focus on raw pagination throughput without amplifying text shaping, wrapping, and compression costs too aggressively.',
-        heavy: ('This appendix intentionally uses a single extra-long English paragraph to stress the PDF pipeline with sustained text flow, repeated clauses, dense punctuation, and business-style wording so that pagination, line breaking, glyph mapping, text extraction order, copy and search behavior, and final file size differences become easier to observe across many repeated blocks; the goal is not decorative content but a realistic wall of text that behaves like procurement documentation, compliance reports, technical specifications, audit notes, migration guidance, implementation summaries, delivery constraints, and appendix remarks merged into one uninterrupted narrative where every sentence keeps pushing the layout engine to preserve semantic reading order, stable wrapping, predictable page boundaries, and compact vector-first output instead of falling back to page-sized bitmap capture that tends to grow much faster as document length increases. ').repeat(5).trim()
+        light: 'This lightweight appendix intentionally keeps the list short so you can evaluate raw pagination throughput while keeping text shaping, wrapping, and compression costs moderate.',
+        heavy: ('This appendix intentionally repeats a realistic design-system rollout paragraph to stress the PDF pipeline with sustained multilingual text flow, mixed CJK and Latin scripts, repeated clauses, and business-style wording. It helps expose pagination breakpoints, line breaking, glyph mapping, text extraction order, copy and search behavior, and final file size differences across many repeated blocks; the goal is not decorative content but a wall of text that behaves like product specifications, implementation notes, adoption summaries, and design-review minutes merged into one continuous narrative, pushing the layout engine to preserve semantic reading order, stable wrapping, predictable page boundaries, and compact vector-first output instead of falling back to page-sized bitmap capture. ').repeat(3).trim()
       }
     },
     zh: {
@@ -319,45 +319,45 @@
       },
       tableGroups: [
         {
-          group: '北区 / 城市更新',
-          statusText: '超预期',
+          group: '基础 / 设计令牌',
+          statusText: '已稳定',
           statusClass: 'is-good',
           rows: [
-            ['$12.4M', '36.2%', '$14.8M', '38.0%'],
-            ['$8.2M', '28.5%', '$9.5M', '30.2%']
+            ['92%', '4.8', '96%', '4.9'],
+            ['88%', '4.6', '91%', '4.7']
           ]
         },
         {
-          group: '亚太 / 采购',
-          statusText: '达标',
+          group: '组件 / Web',
+          statusText: '已稳定',
+          statusClass: 'is-good',
+          rows: [
+            ['85%', '4.5', '89%', '4.6'],
+            ['79%', '4.2', '84%', '4.4']
+          ]
+        },
+        {
+          group: '组件 / 移动端',
+          statusText: '推进中',
           statusClass: 'is-stable',
           rows: [
-            ['$14.1M', '32.8%', '$16.5M', '34.5%'],
-            ['$5.6M', '14.3%', '$6.2M', '15.1%']
+            ['74%', '4.1', '81%', '4.3'],
+            ['68%', '3.9', '75%', '4.1']
           ]
         },
         {
-          group: '欧洲 / 合规档案',
-          statusText: '关注',
+          group: '模式 / 布局',
+          statusText: '需评审',
           statusClass: 'is-watch',
           rows: [
-            ['$9.7M', '24.8%', '$10.9M', '26.1%'],
-            ['$4.4M', '11.6%', '$4.9M', '12.2%']
-          ]
-        },
-        {
-          group: '公共部门 / 交付运营',
-          statusText: '超预期',
-          statusClass: 'is-good',
-          rows: [
-            ['$11.3M', '34.7%', '$13.2M', '35.8%'],
-            ['$6.8M', '19.4%', '$7.6M', '20.6%']
+            ['65%', '3.8', '72%', '4.0'],
+            ['58%', '3.6', '66%', '3.8']
           ]
         }
       ],
       longList: {
-        light: '这个轻量基准会把附录控制得较短，方便你把注意力集中在原始分页吞吐上，而不会过度放大文本塑形、换行和压缩成本。',
-        heavy: ('这段附录会故意使用单段超长正文，持续向 PDF 管线施加文本流压力：它包含重复从句、密集标点和业务化措辞，用来观察分页、换行、字形映射、文本提取顺序、复制检索行为以及最终文件体积差异；目标不是装饰性的内容，而是一堵足够接近真实采购文档、合规报告、技术规格、审计备注、迁移指南、实施总结、交付约束和附录说明的文字墙，让排版引擎持续面对语义阅读顺序、稳定换行、可预测页边界和紧凑矢量输出等问题，而不是退化为更容易随着文档长度暴涨的整页位图捕获。 ').repeat(5).trim()
+        light: '这个轻量附录会把列表控制得较短，方便你评估原始分页吞吐，同时不会过度放大文本塑形、换行和压缩成本。',
+        heavy: ('这段附录会故意重复一段贴近设计系统落地的正文，持续向 PDF 管线施加多语言文本流压力：它包含中英混排、重复从句、密集标点和业务化措辞，用来观察分页切点、换行、字形映射、文本提取顺序、复制检索行为以及最终文件体积差异；目标不是装饰性的内容，而是一堵接近产品规范、实施备注、采用总结和设计评审记录的文字墙，推动排版引擎保持语义阅读顺序、稳定换行、可预测页边界和紧凑矢量输出，而不是退化为更容易随文档长度暴涨的整页位图捕获。 ').repeat(5).trim()
       }
     }
   };
@@ -371,15 +371,17 @@
     { key: 'og-description', selector: 'meta[property="og:description"]', type: 'attr', attr: 'content', en: 'A browser-side DOM-to-PDF rendering engine with HTML and Markdown editing plus real-time PDF preview.' },
     { key: 'twitter-title', selector: 'meta[name="twitter:title"]', type: 'attr', attr: 'content', en: 'dompdf.js Studio - Pure JavaScript DOM-to-PDF Engine' },
     { key: 'twitter-description', selector: 'meta[name="twitter:description"]', type: 'attr', attr: 'content', en: 'A browser-side DOM-to-PDF rendering engine with HTML and Markdown editing plus real-time PDF preview.' },
-    { key: 'schema', selector: 'script[type="application/ld+json"]', type: 'text', en: JSON.stringify({
-      '@context': 'https://schema.org',
-      '@type': 'SoftwareApplication',
-      name: 'dompdf.js',
-      applicationCategory: 'DeveloperApplication',
-      operatingSystem: 'Web',
-      description: 'Pure JavaScript DOM-to-PDF rendering engine',
-      url: 'https://dompdfjs.lisky.com.cn/'
-    }, null, 2) },
+    {
+      key: 'schema', selector: 'script[type="application/ld+json"]', type: 'text', en: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'dompdf.js',
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'Web',
+        description: 'Pure JavaScript DOM-to-PDF rendering engine',
+        url: 'https://dompdfjs.lisky.com.cn/'
+      }, null, 2)
+    },
     { key: 'github-aria', selector: '.sidebar-github-link', type: 'attr', attr: 'aria-label', en: 'View the dompdf.js GitHub repository' },
     { key: 'export-dompdf', selector: '#btn-export-dompdf .btn-label', type: 'text', en: 'Export dompdf.js' },
     { key: 'export-html2pdf', selector: '#btn-export-html2pdf .btn-label', type: 'text', en: 'Export html2pdf.js' },
@@ -420,145 +422,137 @@
     { key: 'specs-row-7-3', selector: '.specs-mini-table tbody tr:nth-child(7) td:nth-child(3)', type: 'text', en: 'Large image-heavy DOMs fail easily' },
     { key: 'tab-basic', selector: '#tab-btn-basic', type: 'text', en: 'Capability Report' },
     { key: 'tab-markdown', selector: '#tab-btn-markdown', type: 'text', en: 'Markdown Editor' },
-    { key: 'header-a4', selector: '.header-info span:first-child', type: 'text', en: 'A4 Page Simulation (794px × 1123px)' },
+    { key: 'header-a4', selector: '.header-info span:first-child', type: 'text', en: 'A4 Page Simulation (794px \u00d7 1123px)' },
     { key: 'header-zoom', selector: '.header-info span:last-child', type: 'text', en: 'Zoom 100%' },
     { key: 'top-loading-aria', selector: '.top-loading-card', type: 'attr', attr: 'aria-label', en: 'Export progress' },
-    { key: 'hero-title', selector: '.report-hero-main h1', type: 'text', en: 'Front-End DOM-to-PDF Capability Report' },
-    { key: 'hero-lede', selector: '.report-hero-main .lede', type: 'text', en: 'This default sample no longer focuses on a flashy collection of styles. Instead, it behaves more like a real document: one DOM covers mixed CJK and Latin text, long paragraphs, structured tables, inline SVG, code blocks, math, pagination control, and protected cross-page containers. That makes dompdf.js easier to evaluate against html2pdf.js on both layout quality and final PDF size.' },
-    { key: 'hero-pill-1', selector: '.report-hero-main .report-pill:nth-child(1)', type: 'text', en: 'Copyable Text' },
-    { key: 'hero-pill-2', selector: '.report-hero-main .report-pill:nth-child(2)', type: 'text', en: 'Multi-page Pagination' },
-    { key: 'hero-pill-3', selector: '.report-hero-main .report-pill:nth-child(3)', type: 'text', en: 'Inline SVG' },
-    { key: 'hero-pill-4', selector: '.report-hero-main .report-pill:nth-child(4)', type: 'text', en: 'CJK + Latin' },
-    { key: 'hero-pill-5', selector: '.report-hero-main .report-pill:nth-child(5)', type: 'text', en: 'divisionDisable' },
-    { key: 'hero-pill-6', selector: '.report-hero-main .report-pill:nth-child(6)', type: 'text', en: 'Math Symbols' },
-    { key: 'hero-meta-eyebrow', selector: '.report-meta-eyebrow', type: 'text', en: 'Demo Goals' },
-    { key: 'hero-meta-1', selector: '.report-meta-list li:nth-child(1)', type: 'html', en: '<strong>Main showcase:</strong> text, tables, SVG, pagination, and searchability' },
-    { key: 'hero-meta-2', selector: '.report-meta-list li:nth-child(2)', type: 'html', en: '<strong>Secondary showcase:</strong> keep one small raster image to validate image embedding' },
-    { key: 'hero-meta-3', selector: '.report-meta-list li:nth-child(3)', type: 'html', en: '<strong>Expected comparison:</strong> dompdf.js stays lighter as page count grows' },
-    { key: 'hero-meta-4', selector: '.report-meta-list li:nth-child(4)', type: 'html', en: '<strong>Export target:</strong> the full <code>#document</code> block' },
-    { key: 'kpi-1-label', selector: '.report-kpi:nth-child(1) .report-kpi-label', type: 'text', en: 'Document Width' },
-    { key: 'kpi-1-desc', selector: '.report-kpi:nth-child(1) span', type: 'text', en: 'Organized around A4 content width to keep the sample representative' },
-    { key: 'kpi-2-label', selector: '.report-kpi:nth-child(2) .report-kpi-label', type: 'text', en: 'Content Strategy' },
-    { key: 'kpi-2-strong', selector: '.report-kpi:nth-child(2) strong', type: 'text', en: 'Text-heavy / Raster-light' },
-    { key: 'kpi-2-desc', selector: '.report-kpi:nth-child(2) span', type: 'text', en: 'Makes the difference between vector text and screenshot PDFs easier to observe' },
-    { key: 'kpi-3-label', selector: '.report-kpi:nth-child(3) .report-kpi-label', type: 'text', en: 'Coverage' },
-    { key: 'kpi-3-strong', selector: '.report-kpi:nth-child(3) strong', type: 'text', en: 'Mixed content modules' },
-    { key: 'kpi-3-desc', selector: '.report-kpi:nth-child(3) span', type: 'text', en: 'Paragraphs, tables, SVG, code, formulas, and pagination control' },
-    { key: 'kpi-4-label', selector: '.report-kpi:nth-child(4) .report-kpi-label', type: 'text', en: 'What to Watch' },
-    { key: 'kpi-4-strong', selector: '.report-kpi:nth-child(4) strong', type: 'text', en: 'Size / Layout / Copy' },
-    { key: 'kpi-4-desc', selector: '.report-kpi:nth-child(4) span', type: 'text', en: 'Look beyond speed and inspect the final PDF quality' },
-    { key: 's1-title', selector: '#document > .report-section:nth-of-type(1) h2', type: 'text', en: 'Text, Fonts, and Copyability' },
-    { key: 's1-summary', selector: '#document > .report-section:nth-of-type(1) .report-section-summary', type: 'text', en: 'This section highlights one of the most important dompdf.js capabilities: text remains text instead of being flattened into a page-sized bitmap. For real business documents, searchability, copyability, and scaling quality matter more than merely looking similar.' },
-    { key: 's1-card1-title', selector: '#document > .report-section:nth-of-type(1) .report-card:first-of-type h3', type: 'text', en: 'Bilingual Business Summary' },
-    { key: 's1-card1-p1', selector: '#document > .report-section:nth-of-type(1) .report-card:first-of-type p:nth-of-type(1)', type: 'text', en: 'Urban Renewal Pilot 2026 is now entering the pre-delivery review phase. This revision focuses on validating the stability of multilingual paragraphs across A4 pagination, embedded fonts, glyph width calculation, and table copyability so the exported PDF can satisfy archival, distribution, review, and search workflows.' },
-    { key: 's1-card1-note', selector: '#document > .report-section:nth-of-type(1) .report-note', type: 'text', en: 'The sample intentionally includes long, dense body copy so html2pdf.js enlarges page-size bitmap output more aggressively, while dompdf.js can still keep the PDF centered around text and vector objects.' },
-    { key: 's1-card2-title', selector: '#document > .report-section:nth-of-type(1) aside h3', type: 'text', en: 'What This Page Verifies' },
-    { key: 's1-card2-li1', selector: '#document > .report-section:nth-of-type(1) aside li:nth-child(1)', type: 'text', en: 'Chinese, English, numbers, and punctuation remain continuously copyable' },
-    { key: 's1-card2-li2', selector: '#document > .report-section:nth-of-type(1) aside li:nth-child(2)', type: 'text', en: 'Keywords and IDs remain searchable after font embedding' },
-    { key: 's1-card2-li3', selector: '#document > .report-section:nth-of-type(1) aside li:nth-child(3)', type: 'text', en: 'Headers, footers, and body content do not overlap in multipage export' },
-    { key: 's1-card2-li4', selector: '#document > .report-section:nth-of-type(1) aside li:nth-child(4)', type: 'text', en: 'Structured tables and lists stay sharp under scaling' },
-    { key: 's1-card2-li5', selector: '#document > .report-section:nth-of-type(1) aside li:nth-child(5)', type: 'html', en: 'Complex containers can remain intact across pages via <code>divisionDisable</code>' },
-    { key: 's2-title', selector: '#document > .report-section:nth-of-type(2) h2', type: 'text', en: 'Modern OKLCH Color Space Support' },
-    { key: 's2-summary', selector: '#document > .report-section:nth-of-type(2) .report-section-summary', type: 'html', en: 'This section shows how dompdf.js supports the CSS Color Level 4 <code>oklch()</code> function and reproduces perceptually smoother modern palettes and vivid gradients in PDF output.' },
-    { key: 's2-card1-title', selector: '#document > .report-section:nth-of-type(2) .report-card:first-of-type h3', type: 'text', en: 'OKLCH Swatch Panel' },
-    { key: 's2-card2-title', selector: '#document > .report-section:nth-of-type(2) .report-card:last-of-type h3', type: 'text', en: 'OKLCH Gradient Card' },
-    { key: 's2-gradient-title', selector: '.oklch-gradient-title', type: 'text', en: 'Aurora Color Flow' },
-    { key: 's2-note', selector: '#document > .report-section:nth-of-type(2) .report-note', type: 'html', en: '<strong>Lossless color normalization:</strong> instead of hand-writing regex parsing for complex <code>oklch()</code> functions, the engine leverages Canvas 2D to serialize and normalize colors at runtime, which makes advanced CSS color functions work out of the box.' },
-    { key: 's3-title', selector: '#document > .report-section:nth-of-type(3) h2', type: 'text', en: 'CSS Pseudo Elements and Vector Rendering' },
-    { key: 's3-summary', selector: '#document > .report-section:nth-of-type(3) .report-section-summary', type: 'html', en: 'This section demonstrates text and icons generated by <code>::before</code> and <code>::after</code>. During PDF export, that content remains vector text and can still be selected and searched independently.' },
-    { key: 's3-card1-title', selector: '#document > .report-section:nth-of-type(3) .report-card:first-of-type h3', type: 'text', en: 'Decorative Components with Pseudo Elements' },
-    { key: 's3-info', selector: '.pseudo-card-info', type: 'html', en: '<code>dompdf.js</code> can descend into pseudo-element nodes during DOM serialization, convert them into virtual nodes, and render their text and shapes as vectors in the Rust + WASM pipeline.' },
-    { key: 's3-warn', selector: '.pseudo-card-warn', type: 'html', en: 'Heavy use of <code>::before</code>/<code>::after</code> may slightly reduce DOM walk throughput, but it does not inflate the final PDF size.' },
-    { key: 's3-marker-title', selector: '#document > .report-section:nth-of-type(3) h4', type: 'text', en: 'List markers via pseudo elements (::marker)' },
-    { key: 's3-ul-label', selector: '#document > .report-section:nth-of-type(3) span[style*=\"无序列表\"]', type: 'text', en: 'Unordered list (ul > li)' },
-    { key: 's3-ol-label', selector: '#document > .report-section:nth-of-type(3) span[style*=\"有序列表\"]', type: 'text', en: 'Ordered list (ol > li)' },
-    { key: 's3-ul-a', selector: '#document > .report-section:nth-of-type(3) ul li:nth-child(1)', type: 'text', en: 'Unordered item A' },
-    { key: 's3-ul-b', selector: '#document > .report-section:nth-of-type(3) ul li:nth-child(2)', type: 'text', en: 'Unordered item B' },
-    { key: 's3-ol-a', selector: '#document > .report-section:nth-of-type(3) ol li:nth-child(1)', type: 'text', en: 'Ordered item 1' },
-    { key: 's3-ol-b', selector: '#document > .report-section:nth-of-type(3) ol li:nth-child(2)', type: 'text', en: 'Ordered item 2' },
-    { key: 's3-card2-title', selector: '#document > .report-section:nth-of-type(3) .report-card:last-of-type h3', type: 'text', en: 'Inline Pseudo Text and Links' },
-    { key: 's3-card2-p1', selector: '#document > .report-section:nth-of-type(3) .report-card:last-of-type p:nth-of-type(1)', type: 'html', en: 'In long-form layouts, pseudo elements are often used to generate opening quotation punctuation: <span class="pseudo-inline-quote">This quote is rendered by the <code>::before</code> and <code>::after</code> content properties.</span>' },
-    { key: 's3-card2-p2', selector: '#document > .report-section:nth-of-type(3) .report-card:last-of-type p:nth-of-type(2)', type: 'html', en: 'Or to add a directional hint after a link: learn more about the technical implementation details in the <a class="fancy-link" href="https://github.com/lmn1919/dompdf.js" target="_blank" rel="noreferrer">dompdf.js GitHub repository</a>.' },
-    { key: 's3-card2-note', selector: '#document > .report-section:nth-of-type(3) .report-card:last-of-type .report-note', type: 'html', en: '<strong>Vector advantage:</strong> screenshot-based engines such as html2pdf rasterize pseudo elements together with the page, while dompdf.js can convert those letters into native PDF text operators, so you can still <strong>search for “TECHNICAL NOTE”</strong> inside the exported PDF.' },
-    { key: 's4-title', selector: '#document > .report-section:nth-of-type(4) h2', type: 'text', en: 'Vector Graphics and Raster Samples' },
-    { key: 's4-summary', selector: '#document > .report-section:nth-of-type(4) .report-section-summary', type: 'text', en: 'The default sample keeps one small bitmap only to validate image compression and embedding. The real focus shifts to inline SVG charts and process diagrams, which align much better with dompdf.js strengths.' },
-    { key: 's4-card1-title', selector: '#document > .report-section:nth-of-type(4) .report-card:first-of-type h3', type: 'text', en: 'Inline SVG Metrics Chart' },
-    { key: 's4-chart-aria', selector: '#document > .report-section:nth-of-type(4) .report-svg-figure', type: 'attr', attr: 'aria-label', en: 'Benchmark chart' },
-    { key: 's4-caption', selector: '.report-figure-caption', type: 'text', en: 'Inline vector charts stay crisp and scalable in dompdf.js, while html2pdf.js tends to convert the full page into a screenshot.' },
-    { key: 's4-card2-title', selector: '.report-raster-copy h3', type: 'text', en: 'Retained Raster Sample' },
-    { key: 's4-card2-p', selector: '.report-raster-copy p', type: 'text', en: 'This page still keeps one Canvas-generated JPEG to validate image compression, sizing, and embedding stability, but it no longer dominates the whole demo.' },
-    { key: 's4-note', selector: '.report-raster-card .report-note', type: 'text', en: 'The default sample now avoids image-heavy full-page layouts. That better matches technical document workflows and makes dompdf.js advantages in text-centric PDFs easier to see.' },
-    { key: 's5-title', selector: '#document > .report-section:nth-of-type(5) h2', type: 'text', en: 'Layout, Clipping, Opacity, and Flow Diagrams' },
-    { key: 's5-summary', selector: '#document > .report-section:nth-of-type(5) .report-section-summary', type: 'text', en: 'This section focuses on whether complex box models remain stable in PDF output, including translucent overlays, clipped regions, rounded corners, inline code, and vector flow diagrams.' },
-    { key: 's5-card1-title', selector: '#document > .report-section:nth-of-type(5) .report-card:first-of-type h3', type: 'text', en: 'Rendering Pipeline Diagram' },
-    { key: 's5-mini1-title', selector: '#document > .report-section:nth-of-type(5) .report-mini-card:nth-child(1) h4', type: 'text', en: 'Clipping Sample' },
-    { key: 's5-mini1-p', selector: '.clip-box p', type: 'html', en: 'This container uses <code>overflow: hidden</code>.' },
-    { key: 's5-mini2-title', selector: '#document > .report-section:nth-of-type(5) .report-mini-card:nth-child(2) h4', type: 'text', en: 'Opacity Sample' },
-    { key: 's5-card2-title', selector: '#document > .report-section:nth-of-type(5) aside h3', type: 'text', en: 'Implementation Focus' },
-    { key: 's5-card2-li1', selector: '#document > .report-section:nth-of-type(5) aside li:nth-child(1)', type: 'text', en: 'Use pure SVG for the flow diagram instead of a pre-baked PNG' },
-    { key: 's5-card2-li2', selector: '#document > .report-section:nth-of-type(5) aside li:nth-child(2)', type: 'text', en: 'Rounded clipped containers must not leak child nodes after export' },
-    { key: 's5-card2-li3', selector: '#document > .report-section:nth-of-type(5) aside li:nth-child(3)', type: 'text', en: 'Translucent stacking order should match the browser view' },
-    { key: 's5-card2-li4', selector: '#document > .report-section:nth-of-type(5) aside li:nth-child(4)', type: 'html', en: 'Keep hierarchy intact for <code>code</code>, bold text, and inline labels' },
-    { key: 's5-note', selector: '#document > .report-section:nth-of-type(5) aside .report-note', type: 'text', en: 'For real documents, layout reliability usually matters more than a single visual effect. This sample intentionally ranks stable typesetting above visual showpieces.' },
-    { key: 's6-title', selector: '#document > .report-section:nth-of-type(6) h2', type: 'text', en: 'Structured Tables and Text Search' },
-    { key: 's6-summary', selector: '#document > .report-section:nth-of-type(6) .report-section-summary', type: 'text', en: 'The detail table below generates many rows to validate column widths, wrapping, font embedding, copy order, and multipage stability at the same time. This kind of content is closer to real reports, lists, and audit documents, and it plays to dompdf.js strengths.' },
-    { key: 's6-card-title', selector: '#document > .report-section:nth-of-type(6) .report-table-head h3', type: 'text', en: 'Capability Validation Matrix' },
-    { key: 's6-card-subtle', selector: '.report-table-subtle', type: 'text', en: 'Covers paragraphs, identifiers, dates, amounts, status chips, and mixed CJK/Latin fields.' },
-    { key: 's6-status-chip', selector: '.report-status-chip', type: 'text', en: 'Live generated' },
-    { key: 's6-th-1', selector: '.report-table thead tr:first-child th:nth-child(1)', type: 'text', en: 'Region / Division' },
-    { key: 's6-th-2', selector: '.report-table thead tr:first-child th:nth-child(2)', type: 'text', en: 'H1 Performance' },
-    { key: 's6-th-3', selector: '.report-table thead tr:first-child th:nth-child(3)', type: 'text', en: 'H2 Forecast' },
-    { key: 's6-th-4', selector: '.report-table thead tr:first-child th:nth-child(4)', type: 'text', en: 'SLA Status' },
-    { key: 's6-th-5', selector: '.report-table thead tr:nth-child(2) th:nth-child(1)', type: 'text', en: 'Revenue' },
-    { key: 's6-th-6', selector: '.report-table thead tr:nth-child(2) th:nth-child(2)', type: 'text', en: 'Margin' },
-    { key: 's6-th-7', selector: '.report-table thead tr:nth-child(2) th:nth-child(3)', type: 'text', en: 'Revenue' },
-    { key: 's6-th-8', selector: '.report-table thead tr:nth-child(2) th:nth-child(4)', type: 'text', en: 'Margin' },
-    { key: 's6-callout', selector: '#document > .report-section:nth-of-type(6) blockquote', type: 'text', en: 'If this whole page can still be selected, copied, and searched in normal reading order after export, then the text objects, glyph mapping, and table structure are already in a usable state.' },
-    { key: 's7-title', selector: '#document > .report-section:nth-of-type(7) h2', type: 'text', en: 'Definition Lists, Code Blocks, and Math Symbols' },
-    { key: 's7-summary', selector: '#document > .report-section:nth-of-type(7) .report-section-summary', type: 'text', en: 'This section focuses on preformatted text, symbol fonts, and formula layout. The styling stays restrained so visual noise does not interfere with reading or comparison.' },
-    { key: 's7-math-title', selector: '.math-block h3', type: 'text', en: 'Math and Symbol Samples' },
-    { key: 's7-math-p1', selector: '.math-block p:nth-of-type(1)', type: 'text', en: 'Euler identity:' },
-    { key: 's7-math-p2', selector: '.math-block p:nth-of-type(3)', type: 'text', en: 'Gaussian integral:' },
-    { key: 's7-math-p3', selector: '.math-block p:nth-of-type(5)', type: 'text', en: 'Bayes theorem:' },
-    { key: 's7-math-p4', selector: '.math-block p:nth-of-type(7)', type: 'text', en: 'Piecewise function:' },
-    { key: 's8-title', selector: '#document > .report-section:nth-of-type(8) h2', type: 'text', en: 'Pagination Stress Test and Appendix' },
-    { key: 's8-summary', selector: '#document > .report-section:nth-of-type(8) .report-section-summary', type: 'text', en: 'This section deliberately stacks long body copy and repeated records so the output naturally spans multiple pages. For html2pdf.js, each page behaves more like a large screenshot; for dompdf.js, increasing text density does not inflate the output in the same way.' },
-    { key: 's8-appendix-note', selector: '.report-appendix-note', type: 'text', en: 'The items below use repeated but non-identical business text to verify list pagination, continuous copy behavior, and paragraph splitting near page boundaries.' },
-    { key: 's8-timeline-title', selector: '.timeline-card-doc h3', type: 'text', en: 'Forced Page Break Sample' },
-    { key: 's8-timeline-phase1', selector: '.timeline-item:nth-child(1) strong', type: 'text', en: 'Phase 1 · Snapshot Contract' },
-    { key: 's8-timeline-phase1-p', selector: '.timeline-item:nth-child(1) p', type: 'text', en: 'Freeze the DOM snapshot schema so text, images, layout, and pagination control signals all enter the worker in a stable format.' },
-    { key: 's8-timeline-phase2', selector: '.timeline-item:nth-child(2) strong', type: 'text', en: 'Phase 2 · Typography Validation' },
-    { key: 's8-timeline-phase2-p', selector: '.timeline-item:nth-child(2) p', type: 'text', en: 'Run targeted regression checks for Chinese fonts, numbers, English words, code fragments, math symbols, and copy order.' },
-    { key: 's8-timeline-phase3', selector: '.timeline-item:nth-child(3) strong', type: 'text', en: 'Phase 3 · Document Scale' },
-    { key: 's8-timeline-phase3-p', selector: '.timeline-item:nth-child(3) p', type: 'text', en: 'Use realistically long content to widen the final PDF size gap and verify that pagination breakpoints stay stable.' },
-    { key: 's8-division-title', selector: '.division-box h3', type: 'text', en: 'divisionDisable Sample' },
-    { key: 's8-division-p1', selector: '.division-box p:nth-of-type(1)', type: 'html', en: 'This module carries the <code>divisionDisable</code> attribute. When a page break occurs, it should move to the next page as one intact block instead of being cut through the middle. In real documents, signature panels, quote summaries, approval notes, and cover sheets often need this protection.' },
-    { key: 's8-division-p2', selector: '.division-box p:nth-of-type(2)', type: 'text', en: 'If this card is split at the page boundary, the pagination merge and block relocation strategy for complex containers still needs more work.' },
-    { key: 'form-kicker', selector: '#form-controls-kicker', type: 'text', en: 'Forms' },
-    { key: 'form-title', selector: '#form-controls-title', type: 'text', en: 'Form Controls and Interactive Field Export' },
-    { key: 'form-summary', selector: '#form-controls-summary', type: 'text', en: 'This section validates the form export pipeline: static mode preserves the current visual appearance, while interactive mode emits editable PDF fields for text boxes, selects, checkboxes, and radios. Date, range, color, file, and progress-like controls stay as accurate static output.' },
-    { key: 'form-card-text-title', selector: '#form-card-text-title', type: 'text', en: 'Text and Choice Controls' },
-    { key: 'form-label-project', selector: '#form-label-project', type: 'text', en: 'Project Name' },
+
+    /* Hero */
+    { key: 'hero-eyebrow', selector: '#hero-eyebrow', type: 'text', en: 'Global Product Design Spec' },
+    { key: 'hero-title', selector: '#hero-title', type: 'text', en: 'Orbit Design System International Delivery Spec' },
+    { key: 'hero-lede', selector: '#hero-lede', type: 'text', en: 'This example uses a fictional global product design spec to cover real document scenarios such as mixed Chinese and English text, color systems, SVG icons, component states, structured tables, form controls, code formulas, and pagination protection. It fully verifies dompdf.js vector rendering, text copyability, and multilingual typesetting when converting front-end DOM to PDF.' },
+    { key: 'hero-pill-1', selector: '#hero-pills .ds-pill:nth-child(1)', type: 'text', en: 'Chinese-English Mix' },
+    { key: 'hero-pill-2', selector: '#hero-pills .ds-pill:nth-child(2)', type: 'text', en: 'Vector SVG' },
+    { key: 'hero-pill-3', selector: '#hero-pills .ds-pill:nth-child(3)', type: 'text', en: 'Structured Tables' },
+    { key: 'hero-pill-4', selector: '#hero-pills .ds-pill:nth-child(4)', type: 'text', en: 'Form Controls' },
+    { key: 'hero-pill-5', selector: '#hero-pills .ds-pill:nth-child(5)', type: 'text', en: 'Math Formulas' },
+    { key: 'hero-pill-6', selector: '#hero-pills .ds-pill:nth-child(6)', type: 'text', en: 'Pagination Guard' },
+    { key: 'meta-doc-label', selector: '#meta-doc-label', type: 'text', en: 'Document ID' },
+    { key: 'meta-version-label', selector: '#meta-version-label', type: 'text', en: 'Version' },
+    { key: 'meta-owner-label', selector: '#meta-owner-label', type: 'text', en: 'Owner' },
+    { key: 'meta-scope-label', selector: '#meta-scope-label', type: 'text', en: 'Scope' },
+
+    /* KPI */
+    { key: 'kpi-1-label', selector: '#kpi-1-label', type: 'text', en: 'Components' },
+    { key: 'kpi-1-desc', selector: '#kpi-1-desc', type: 'text', en: 'Covers buttons, inputs, feedback, navigation, and data display categories.' },
+    { key: 'kpi-2-label', selector: '#kpi-2-label', type: 'text', en: 'Design Tokens' },
+    { key: 'kpi-2-desc', selector: '#kpi-2-desc', type: 'text', en: 'Colors, spacing, typography, radii, and shadows are fully parameterized.' },
+    { key: 'kpi-3-label', selector: '#kpi-3-label', type: 'text', en: 'Languages' },
+    { key: 'kpi-3-desc', selector: '#kpi-3-desc', type: 'text', en: 'Includes Chinese, English, and RTL layout experiments.' },
+    { key: 'kpi-4-label', selector: '#kpi-4-label', type: 'text', en: 'Export Mode' },
+    { key: 'kpi-4-desc', selector: '#kpi-4-desc', type: 'text', en: 'Text and SVG are output as vectors, supporting scaling and search.' },
+
+    /* Section 01 - Typography & i18n */
+    { key: 'sec-01-kicker', selector: '#sec-01-kicker', type: 'text', en: 'Typography & i18n' },
+    { key: 'sec-01-title', selector: '#sec-01-title', type: 'text', en: 'Multilingual Typesetting and Text Layer' },
+    { key: 'sec-01-summary', selector: '#sec-01-summary', type: 'text', en: 'Global documents must handle mixed Chinese and English text plus numbers. This section verifies how different scripts behave in pagination, line height, letter spacing, and copy order, ensuring every character in the final PDF remains a selectable text object.' },
+    { key: 'sec-01-card-1-title', selector: '#sec-01-card-1-title', type: 'text', en: 'Multilingual Samples' },
+    { key: 'sec-01-card-2-title', selector: '#sec-01-card-2-title', type: 'text', en: 'Typesetting Checklist' },
+    { key: 'sec-01-check-1', selector: '#sec-01-check-1', type: 'text', en: 'CJK characters and Latin letters maintain natural letter spacing.' },
+    { key: 'sec-01-check-2', selector: '#sec-01-check-2', type: 'text', en: 'Bold, italic, and inline code do not lose styling at line breaks.' },
+    { key: 'sec-01-check-3', selector: '#sec-01-check-3', type: 'text', en: 'Line height and first-line indentation remain consistent when paragraphs span pages.' },
+    { key: 'sec-01-check-4', selector: '#sec-01-check-4', type: 'text', en: 'Exported text can be searched for "DesignOps" or "\u8bbe\u8ba1\u7cfb\u7edf" directly.' },
+    { key: 'sec-01-check-5', selector: '#sec-01-check-5', type: 'text', en: 'Blockquotes use pseudo-elements to render decorative quotation marks.' },
+    { key: 'sec-01-quote', selector: '#sec-01-quote', type: 'text', en: 'Good typography is invisible: readers notice only the content, not the complex calculations behind fonts, spacing, and pagination.' },
+
+    /* Section 02 - Color System */
+    { key: 'sec-02-kicker', selector: '#sec-02-kicker', type: 'text', en: 'Color System' },
+    { key: 'sec-02-title', selector: '#sec-02-title', type: 'text', en: 'Color System and Gradients' },
+    { key: 'sec-02-summary', selector: '#sec-02-summary', type: 'text', en: 'Modern interfaces rely on precise color delivery. This section shows standardized definitions of brand, functional, and neutral colors, plus the reproduction of linear gradients in PDF vector output.' },
+    { key: 'sec-02-card-1-title', selector: '#sec-02-card-1-title', type: 'text', en: 'Brand & Functional Swatches' },
+    { key: 'sec-02-card-2-title', selector: '#sec-02-card-2-title', type: 'text', en: 'Gradients and Neutral Steps' },
+    { key: 'sec-02-swatch-1-name', selector: '#sec-02-swatch-1-name', type: 'text', en: 'Primary Blue' },
+    { key: 'sec-02-swatch-1-desc', selector: '#sec-02-swatch-1-desc', type: 'text', en: '#2563eb \u00b7 Used for primary buttons, links, and key icons.' },
+    { key: 'sec-02-swatch-2-name', selector: '#sec-02-swatch-2-name', type: 'text', en: 'Success Green' },
+    { key: 'sec-02-swatch-2-desc', selector: '#sec-02-swatch-2-desc', type: 'text', en: '#10b981 \u00b7 Used for completion states and positive feedback.' },
+    { key: 'sec-02-swatch-3-name', selector: '#sec-02-swatch-3-name', type: 'text', en: 'Warning Amber' },
+    { key: 'sec-02-swatch-3-desc', selector: '#sec-02-swatch-3-desc', type: 'text', en: '#f59e0b \u00b7 Used for warnings and attention states.' },
+    { key: 'sec-02-swatch-4-name', selector: '#sec-02-swatch-4-name', type: 'text', en: 'Error Red' },
+    { key: 'sec-02-swatch-4-desc', selector: '#sec-02-swatch-4-desc', type: 'text', en: '#ef4444 \u00b7 Used for error messages and destructive actions.' },
+    { key: 'sec-02-note-strong', selector: '#sec-02-note-strong', type: 'text', en: 'Vector gradient note:' },
+    { key: 'sec-02-note-text', selector: '#sec-02-note-text', type: 'text', en: 'dompdf.js parses CSS gradients into PDF gradient shaders, keeping transitions smooth when zoomed without the jaggies or banding typical of bitmap stretching.' },
+
+    /* Section 03 - Iconography & SVG */
+    { key: 'sec-03-kicker', selector: '#sec-03-kicker', type: 'text', en: 'Iconography & SVG' },
+    { key: 'sec-03-title', selector: '#sec-03-title', type: 'text', en: 'Icon System and Vector Graphics' },
+    { key: 'sec-03-summary', selector: '#sec-03-summary', type: 'text', en: 'Icons are the most frequently used graphic elements in interfaces. This section verifies the clarity and scalability of inline SVG icon grids, trend charts, and raster samples after export.' },
+    { key: 'sec-03-card-1-title', selector: '#sec-03-card-1-title', type: 'text', en: 'SVG Icon Grid' },
+    { key: 'sec-03-card-2-title', selector: '#sec-03-card-2-title', type: 'text', en: 'Vector Trend Chart' },
+    { key: 'sec-03-icon-1', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(1) span', type: 'text', en: 'Home' },
+    { key: 'sec-03-icon-2', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(2) span', type: 'text', en: 'Mail' },
+    { key: 'sec-03-icon-3', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(3) span', type: 'text', en: 'Settings' },
+    { key: 'sec-03-icon-4', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(4) span', type: 'text', en: 'Shield' },
+    { key: 'sec-03-icon-5', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(5) span', type: 'text', en: 'Download' },
+    { key: 'sec-03-icon-6', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(6) span', type: 'text', en: 'Clock' },
+    { key: 'sec-03-icon-7', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(7) span', type: 'text', en: 'Users' },
+    { key: 'sec-03-icon-8', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(8) span', type: 'text', en: 'Layout' },
+    { key: 'sec-03-icon-9', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(9) span', type: 'text', en: 'Chart' },
+    { key: 'sec-03-icon-10', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(10) span', type: 'text', en: 'File' },
+    { key: 'sec-03-icon-11', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(11) span', type: 'text', en: 'Layers' },
+    { key: 'sec-03-icon-12', selector: '#document > .report-section:nth-of-type(3) .ds-icon-grid .ds-icon-cell:nth-child(12) span', type: 'text', en: 'Info' },
+    { key: 'sec-03-caption', selector: '#sec-03-caption', type: 'text', en: 'Text, polylines, and filled areas in the chart are all vector objects. After export they can be selected and searched individually, avoiding the pixelation common in screenshot engines.' },
+
+    /* Section 04 - Layout & Components */
+    { key: 'sec-04-kicker', selector: '#sec-04-kicker', type: 'text', en: 'Layout & Components' },
+    { key: 'sec-04-title', selector: '#sec-04-title', type: 'text', en: 'Layout, Components, and Visual States' },
+    { key: 'sec-04-summary', selector: '#sec-04-summary', type: 'text', en: 'Real interface documents include badges, alerts, buttons, clipped containers, and transparent overlays. This section verifies the stability of these common visual patterns during PDF pagination and rendering.' },
+    { key: 'sec-04-card-1-title', selector: '#sec-04-card-1-title', type: 'text', en: 'Component State Showcase' },
+    { key: 'sec-04-card-2-title', selector: '#sec-04-card-2-title', type: 'text', en: 'Layout Feature Verification' },
+    { key: 'sec-04-mini-1-title', selector: '#document > .report-section:nth-of-type(4) .report-mini-card:nth-child(1) h4', type: 'text', en: 'Overflow Clipping' },
+    { key: 'sec-04-mini-2-title', selector: '#document > .report-section:nth-of-type(4) .report-mini-card:nth-child(2) h4', type: 'text', en: 'Opacity Stacking' },
+    { key: 'sec-04-alert-info', selector: '#sec-04-alert-info', type: 'text', en: 'Info: This component has passed accessibility review and is ready for production.' },
+    { key: 'sec-04-alert-warn', selector: '#sec-04-alert-warn', type: 'text', en: 'Caution: Legacy APIs will be removed in the next major version; please migrate soon.' },
+    { key: 'sec-04-note', selector: '#sec-04-note', type: 'html', en: 'The component card on the left carries the <code>divisionDisable</code> attribute, so it should move as a whole block across pages and avoid cutting buttons or badges in half.' },
+
+    /* Section 05 - Structured Data */
+    { key: 'sec-05-kicker', selector: '#sec-05-kicker', type: 'text', en: 'Structured Data' },
+    { key: 'sec-05-title', selector: '#sec-05-title', type: 'text', en: 'Structured Data Tables' },
+    { key: 'sec-05-summary', selector: '#sec-05-summary', type: 'text', en: 'Design system adoption must be measured with data. The table below is generated dynamically to verify column width distribution, numeric alignment, grouped rows, status chips, and mixed Chinese-English fields in PDF.' },
+    { key: 'sec-05-table-title', selector: '#sec-05-table-title', type: 'text', en: 'Component Adoption Matrix' },
+    { key: 'sec-05-table-subtle', selector: '#sec-05-table-subtle', type: 'text', en: 'Covers component name, owning team, adoption rate, performance score, and SLA status.' },
+    { key: 'sec-05-chip', selector: '#sec-05-chip', type: 'text', en: 'Dynamically generated' },
+    { key: 'sec-05-th-1', selector: '#document > .report-section:nth-of-type(5) .report-table thead tr:nth-child(1) th:nth-child(1)', type: 'text', en: 'Team' },
+    { key: 'sec-05-th-2', selector: '#document > .report-section:nth-of-type(5) .report-table thead tr:nth-child(1) th:nth-child(2)', type: 'text', en: 'H1' },
+    { key: 'sec-05-th-3', selector: '#document > .report-section:nth-of-type(5) .report-table thead tr:nth-child(1) th:nth-child(3)', type: 'text', en: 'H2' },
+    { key: 'sec-05-th-4', selector: '#document > .report-section:nth-of-type(5) .report-table thead tr:nth-child(1) th:nth-child(4)', type: 'text', en: 'SLA' },
+    { key: 'sec-05-th-5', selector: '#document > .report-section:nth-of-type(5) .report-table thead tr:nth-child(2) th:nth-child(1)', type: 'text', en: 'Adoption' },
+    { key: 'sec-05-th-6', selector: '#document > .report-section:nth-of-type(5) .report-table thead tr:nth-child(2) th:nth-child(2)', type: 'text', en: 'Satisfaction' },
+    { key: 'sec-05-th-7', selector: '#document > .report-section:nth-of-type(5) .report-table thead tr:nth-child(2) th:nth-child(3)', type: 'text', en: 'Adoption' },
+    { key: 'sec-05-th-8', selector: '#document > .report-section:nth-of-type(5) .report-table thead tr:nth-child(2) th:nth-child(4)', type: 'text', en: 'Satisfaction' },
+    { key: 'sec-05-callout', selector: '#sec-05-callout', type: 'text', en: 'If after export you can still select numbers by column, search team names, and copy status labels completely, then table structure, glyph mapping, and text objects are all correct.' },
+
+    /* Section 06 - Forms */
+    { key: 'sec-06-kicker', selector: '#sec-06-kicker', type: 'text', en: 'Forms' },
+    { key: 'sec-06-title', selector: '#sec-06-title', type: 'text', en: 'Form Controls and Field Export' },
+    { key: 'sec-06-summary', selector: '#sec-06-summary', type: 'text', en: 'Business documents commonly contain form fields that need to keep current values and visual states in PDF. This section covers text, choice, date, range, color, and progress controls to verify static and interactive export paths.' },
+    { key: 'sec-06-card-1-title', selector: '#sec-06-card-1-title', type: 'text', en: 'Text and Choice' },
+    { key: 'sec-06-card-2-title', selector: '#sec-06-card-2-title', type: 'text', en: 'State and Static-only Controls' },
+    { key: 'form-label-project', selector: '#form-label-project', type: 'text', en: 'Component Name' },
     { key: 'form-label-owner', selector: '#form-label-owner', type: 'text', en: 'Owner' },
-    { key: 'form-label-email', selector: '#form-label-email', type: 'text', en: 'Notification Email' },
-    { key: 'form-label-password', selector: '#form-label-password', type: 'text', en: 'Approval Passcode' },
-    { key: 'form-label-stage', selector: '#form-label-stage', type: 'text', en: 'Delivery Stage' },
-    { key: 'form-stage-option-1', selector: '#form-stage-option-1', type: 'text', en: 'Solution Review' },
-    { key: 'form-stage-option-2', selector: '#form-stage-option-2', type: 'text', en: 'Pre-delivery Validation' },
-    { key: 'form-stage-option-3', selector: '#form-stage-option-3', type: 'text', en: 'Batch Release' },
-    { key: 'form-label-tags', selector: '#form-label-tags', type: 'text', en: 'Review Tags' },
-    { key: 'form-tag-option-1', selector: '#form-tag-option-1', type: 'text', en: 'Stable Pagination' },
-    { key: 'form-tag-option-2', selector: '#form-tag-option-2', type: 'text', en: 'Correct Text Layer' },
-    { key: 'form-tag-option-3', selector: '#form-tag-option-3', type: 'text', en: 'Performance Regression' },
-    { key: 'form-tag-option-4', selector: '#form-tag-option-4', type: 'text', en: 'Interactive Fields' },
-    { key: 'form-label-notes', selector: '#form-label-notes', type: 'text', en: 'Export Notes' },
-    { key: 'form-label-readonly', selector: '#form-label-readonly', type: 'text', en: 'Readonly ID' },
-    { key: 'form-label-disabled', selector: '#form-label-disabled', type: 'text', en: 'Disabled Sample' },
-    { key: 'form-note-text', selector: '#form-note-text', type: 'html', en: 'This card carries <code>divisionDisable</code> so we can verify the whole group stays intact near page boundaries. In interactive mode, text-like fields should remain editable; in static mode, the current value and placeholder appearance should be preserved.' },
-    { key: 'form-card-state-title', selector: '#form-card-state-title', type: 'text', en: 'Stateful and Static-only Controls' },
-    { key: 'form-row-checks', selector: '#form-row-checks', type: 'text', en: 'Checks' },
-    { key: 'form-checkbox-1', selector: '#form-checkbox-1', type: 'text', en: 'Regression complete' },
-    { key: 'form-checkbox-2', selector: '#form-checkbox-2', type: 'text', en: 'Needs manual review' },
+    { key: 'form-label-email', selector: '#form-label-email', type: 'text', en: 'Contact Email' },
+    { key: 'form-label-password', selector: '#form-label-password', type: 'text', en: 'Access Token' },
+    { key: 'form-label-stage', selector: '#form-label-stage', type: 'text', en: 'Design Stage' },
+    { key: 'form-stage-option-1', selector: '#form-stage-option-1', type: 'text', en: 'Draft' },
+    { key: 'form-stage-option-2', selector: '#form-stage-option-2', type: 'text', en: 'In Review' },
+    { key: 'form-stage-option-3', selector: '#form-stage-option-3', type: 'text', en: 'Released' },
+    { key: 'form-label-tags', selector: '#form-label-tags', type: 'text', en: 'Platforms' },
+    { key: 'form-tag-option-1', selector: '#form-tag-option-1', type: 'text', en: 'Web' },
+    { key: 'form-tag-option-2', selector: '#form-tag-option-2', type: 'text', en: 'iOS' },
+    { key: 'form-tag-option-3', selector: '#form-tag-option-3', type: 'text', en: 'Android' },
+    { key: 'form-tag-option-4', selector: '#form-tag-option-4', type: 'text', en: 'Desktop' },
+    { key: 'form-label-notes', selector: '#form-label-notes', type: 'text', en: 'Notes' },
+    { key: 'form-row-checks', selector: '#form-row-checks', type: 'text', en: 'Checklist' },
+    { key: 'form-checkbox-1', selector: '#form-checkbox-1', type: 'text', en: 'Design aligned' },
+    { key: 'form-checkbox-2', selector: '#form-checkbox-2', type: 'text', en: 'Needs second review' },
     { key: 'form-row-radio', selector: '#form-row-radio', type: 'text', en: 'Release Track' },
     { key: 'form-radio-1', selector: '#form-radio-1', type: 'text', en: 'Canary' },
     { key: 'form-radio-2', selector: '#form-radio-2', type: 'text', en: 'Stable' },
@@ -566,13 +560,45 @@
     { key: 'form-label-time', selector: '#form-label-time', type: 'text', en: 'Review Time' },
     { key: 'form-label-month', selector: '#form-label-month', type: 'text', en: 'Archive Month' },
     { key: 'form-label-week', selector: '#form-label-week', type: 'text', en: 'Schedule Week' },
-    { key: 'form-label-datetime', selector: '#form-label-datetime', type: 'text', en: 'Freeze Time' },
-    { key: 'form-label-range', selector: '#form-label-range', type: 'text', en: 'Risk Threshold' },
+    { key: 'form-label-range', selector: '#form-label-range', type: 'text', en: 'Completion' },
     { key: 'form-label-color', selector: '#form-label-color', type: 'text', en: 'Theme Color' },
-    { key: 'form-label-file', selector: '#form-label-file', type: 'text', en: 'Attachments' },
-    { key: 'form-label-progress', selector: '#form-label-progress', type: 'text', en: 'Export Progress' },
+    { key: 'form-label-progress', selector: '#form-label-progress', type: 'text', en: 'Document Progress' },
     { key: 'form-label-meter', selector: '#form-label-meter', type: 'text', en: 'Quality Score' },
-    { key: 'form-note-state', selector: '#form-note-state', type: 'text', en: 'Range, color, file, progress, and meter controls keep accurate static output but do not emit broken interactive fields. Checkboxes and radios should remain toggleable in an interactive PDF.' },
+
+    /* Section 07 - Code & Math */
+    { key: 'sec-07-kicker', selector: '#sec-07-kicker', type: 'text', en: 'Code & Math' },
+    { key: 'sec-07-title', selector: '#sec-07-title', type: 'text', en: 'Code Blocks and Math Formulas' },
+    { key: 'sec-07-summary', selector: '#sec-07-summary', type: 'text', en: 'Technical documents often contain preformatted text and formulas that require monospace fonts, superscripts, subscripts, and piecewise structures. This section verifies the readability of these rich-text elements after pagination.' },
+    { key: 'sec-07-code-title-1', selector: '#sec-07-code-title-1', type: 'text', en: 'Design Token JSON' },
+    { key: 'sec-07-code-title-2', selector: '#sec-07-code-title-2', type: 'text', en: 'Render Pipeline' },
+    { key: 'sec-07-math-title', selector: '#sec-07-math-title', type: 'text', en: 'Math and Symbol Samples' },
+    { key: 'sec-07-math-1', selector: '#sec-07-math-1', type: 'text', en: 'Euler identity:' },
+    { key: 'sec-07-math-2', selector: '#sec-07-math-2', type: 'text', en: 'Gaussian integral:' },
+    { key: 'sec-07-math-3', selector: '#sec-07-math-3', type: 'text', en: 'Bayes theorem:' },
+    { key: 'sec-07-math-4', selector: '#sec-07-math-4', type: 'text', en: 'Piecewise function:' },
+
+    /* Section 08 - Pagination */
+    { key: 'sec-08-kicker', selector: '#sec-08-kicker', type: 'text', en: 'Pagination' },
+    { key: 'sec-08-title', selector: '#sec-08-title', type: 'text', en: 'Pagination Stress and Document Integrity' },
+    { key: 'sec-08-summary', selector: '#sec-08-summary', type: 'text', en: 'Real documents usually span multiple pages. This section verifies dompdf.js behavior at pagination cut points, continuous copying, and complex block relocation through repeated entries, forced page breaks, and cross-page protected containers.' },
+    { key: 'sec-08-appendix-note', selector: '#sec-08-appendix-note', type: 'text', en: 'The items below are generated dynamically to verify long-list pagination behavior and text continuity.' },
+    { key: 'sec-08-timeline-title', selector: '#sec-08-timeline-title', type: 'text', en: 'Release Milestones' },
+    { key: 'sec-08-timeline-phase-1-title', selector: '#sec-08-timeline-phase-1-title', type: 'text', en: 'Phase 1 \u00b7 Design Spec Freeze' },
+    { key: 'sec-08-timeline-phase-1-text', selector: '#sec-08-timeline-phase-1-text', type: 'text', en: 'Finalize and lock the version of design tokens such as colors, typography, spacing, and radii.' },
+    { key: 'sec-08-timeline-phase-2-title', selector: '#sec-08-timeline-phase-2-title', type: 'text', en: 'Phase 2 \u00b7 Component Implementation and Testing' },
+    { key: 'sec-08-timeline-phase-2-text', selector: '#sec-08-timeline-phase-2-text', type: 'text', en: 'Complete core component development on Web, iOS, and Android, and pass visual regression testing.' },
+    { key: 'sec-08-timeline-phase-3-title', selector: '#sec-08-timeline-phase-3-title', type: 'text', en: 'Phase 3 \u00b7 Documentation and Delivery' },
+    { key: 'sec-08-timeline-phase-3-text', selector: '#sec-08-timeline-phase-3-text', type: 'text', en: 'Generate PDF spec documents for design and engineering, confirming pagination, table of contents, bookmarks, and search availability.' },
+    { key: 'sec-08-guard-title', selector: '#sec-08-guard-title', type: 'text', en: 'Cross-page Protection Sample' },
+    { key: 'sec-08-guard-text', selector: '#sec-08-guard-text', type: 'html', en: 'This module carries the <code>divisionDisable</code> attribute. When content nears the bottom of a page, it should move to the next page as a whole block instead of being cut in half. Real-world scenarios such as signature areas, approval notes, and invoice covers need similar protection.' },
+
+    /* Section 09 - Raster Sample */
+    { key: 'sec-09-kicker', selector: '#sec-09-kicker', type: 'text', en: 'Raster Sample' },
+    { key: 'sec-09-title', selector: '#sec-09-title', type: 'text', en: 'Raster Image Embedding' },
+    { key: 'sec-09-summary', selector: '#sec-09-summary', type: 'text', en: 'Although dompdf.js excels at vector text, real businesses still need bitmaps. This section keeps one Canvas-generated sample image to verify compression, sizing, and embedding stability.' },
+    { key: 'sec-09-caption', selector: '#sec-09-caption', type: 'text', en: 'This image is a JPEG bitmap sample used to confirm color, sizing, and compression behavior after export.' },
+
+    /* Markdown panel */
     { key: 'md-input-title', selector: '#panel-markdown .md-editor-panel .md-panel-title span', type: 'text', en: 'Markdown Input' },
     { key: 'md-preview-title', selector: '#panel-markdown .md-preview-panel .md-panel-title span', type: 'text', en: 'Typeset Preview (A4)' },
     { key: 'md-empty-state', selector: '.md-empty-state p', type: 'text', en: 'Type Markdown on the left and it will automatically render into an A4 layout on the right' }
@@ -1542,7 +1568,7 @@
 
     var localeLongList = getLocalePack().longList;
     var entries = benchmarkMode === 'light' ? localeLongList.light : localeLongList.heavy;
-    var repeatCount = benchmarkMode === 'light' ? 1 : benchmarkMode === 'extreme' ? 8940 : 440;
+    var repeatCount = benchmarkMode === 'light' ? 1 : benchmarkMode === 'extreme' ? 22350 : 985;
     var batchSize = benchmarkMode === 'extreme' ? 120 : repeatCount;
 
     return new Promise(function (resolve) {
