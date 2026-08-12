@@ -47,7 +47,6 @@ diagnose-output.txt
 diagnose-stderr.txt
 scripts/diagnose-*.pdf
 
-deploy/
+.codex
 
 web
-.codex
