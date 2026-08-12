@@ -1,4 +1,4 @@
-﻿(function () {
+(function () {
   /* ========================= Globals ========================= */
   var api = window.dompdf;
   var markedApi = window.marked;
@@ -17,8 +17,8 @@
   var html2pdfLoader = null;
   var pdfJsLoader = null;
   var pdfJsReady = false;
-  var overlayOn = false;
   var activeTab = 'basic';
+
   var LOCALE_STORAGE_KEY = 'dompdf-studio-locale';
   var currentLocale = getSavedLocale();
   var benchmarkMode = 'light';
@@ -787,7 +787,7 @@
     document.getElementById('benchmark-mode-light').classList.toggle('active', benchmarkMode === 'light');
     document.getElementById('benchmark-mode-heavy').classList.toggle('active', benchmarkMode === 'heavy');
     document.getElementById('benchmark-mode-extreme').classList.toggle('active', benchmarkMode === 'extreme');
-    document.getElementById('benchmark-mode-light').textContent = currentLocale === 'zh' ? '7页' : '7 Pages';
+    document.getElementById('benchmark-mode-light').textContent = currentLocale === 'zh' ? '9页' : '9 Pages';
     document.getElementById('benchmark-mode-heavy').textContent = currentLocale === 'zh' ? '500页' : '500 Pages';
     document.getElementById('benchmark-mode-extreme').textContent = currentLocale === 'zh' ? '10000页' : '10k Pages';
     document.querySelector('.benchmark-mode-switch').setAttribute('aria-label', currentLocale === 'zh' ? '生成页数' : 'Generated pages');
