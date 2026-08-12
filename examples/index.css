@@ -838,7 +838,7 @@ body {
   width: 100%;
   max-width: 794px;
   min-height: 1123px;
-  padding: 60px 68px;
+  padding: 60px 48px;
   border: 1px solid var(--border-color);
   border-radius: 8px;
   background: var(--surface);
@@ -1056,10 +1056,10 @@ body {
 }
 
 .report-card {
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: #fbfcfd;
-  padding: 20px 22px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
   break-inside: avoid;
   page-break-inside: avoid;
 }
@@ -1094,22 +1094,21 @@ body {
 }
 
 .report-checklist li::before {
-  content: "";
+  content: "✓";
   position: absolute;
   left: 0;
-  top: 8px;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #7891b2;
+  top: 0;
+  color: #2563eb;
+  font-weight: 700;
+  font-size: 12px;
 }
 
 .report-note {
   margin-top: 14px;
-  padding: 10px 12px;
-  border-left: 3px solid #7891b2;
-  border-radius: 6px;
-  background: #f5f8fb;
+  padding: 8px 12px;
+  border-left: 3px solid #2563eb;
+  border-radius: 0;
+  background: transparent;
   color: var(--text-secondary);
   font-size: 12px;
   line-height: 1.7;
@@ -1165,9 +1164,9 @@ body {
   width: 100%;
   height: auto;
   display: block;
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: transparent;
 }
 
 .report-figure-caption {
@@ -1185,10 +1184,10 @@ body {
 }
 
 .report-mini-card {
-  padding: 14px 16px;
-  border: 1px solid #e3e9ef;
-  border-radius: 8px;
-  background: #ffffff;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .report-table-head {
@@ -1205,7 +1204,10 @@ body {
 }
 
 .report-table-shell {
-  background: #ffffff;
+  background: transparent;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .report-table thead th {
@@ -1284,10 +1286,10 @@ body {
 }
 
 .report-appendix {
-  border: 1px solid var(--border-color);
-  border-radius: 10px;
-  background: #fbfcfd;
-  padding: 18px 20px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .report-appendix-note {
@@ -1448,10 +1450,10 @@ body {
 .note-card,
 .rail-card,
 .rich-card {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: #f8fafc;
-  padding: 18px 20px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .compact-list {
@@ -1645,12 +1647,12 @@ body {
 
 .callout {
   margin: 16px 0 0;
-  padding: 18px 20px;
-  border-left: 4px solid var(--accent);
-  border-radius: 8px;
-  background: var(--accent-soft);
+  padding: 12px 16px;
+  border-left: 3px solid var(--accent);
+  border-radius: 0;
+  background: transparent;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .two-column {
@@ -1773,6 +1775,14 @@ body {
   color: inherit;
 }
 
+.report-code .tok-key { color: #38bdf8; font-weight: 600; }
+.report-code .tok-val { color: #fde047; }
+.report-code .tok-fn { color: #818cf8; font-weight: 600; }
+.report-code .tok-param { color: #cbd5e1; }
+.report-code .tok-arrow { color: #f472b6; font-weight: 700; }
+.report-code .tok-type { color: #34d399; font-weight: 600; }
+.report-code .tok-punct { color: #94a3b8; }
+
 .doc ol {
   padding-left: 22px;
 }
@@ -1783,12 +1793,12 @@ body {
 }
 
 .timeline-card-doc {
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  background: #f8fafc;
-  padding: 18px 20px;
-  margin-top: 16px;
-  margin-bottom: 16px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 0;
+  margin-top: 24px;
+  margin-bottom: 24px;
 }
 
 .timeline {
@@ -1836,10 +1846,10 @@ body {
 
 .math-block {
   margin-top: 28px;
-  padding: 18px 22px;
-  background: #f8fafc;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
 }
 
 .math-block h3 {
@@ -1857,9 +1867,9 @@ body {
 .math-block .equation {
   margin: 6px 0 14px;
   padding: 10px 14px;
-  background: #ffffff;
+  background: transparent;
   border-left: 3px solid var(--accent);
-  border-radius: 4px;
+  border-radius: 0;
   font-family: "Cambria Math", "Latin Modern Math", "STIX Two Math", "Times New Roman", serif;
   font-size: 15px;
   color: var(--text-primary);
@@ -2298,6 +2308,7 @@ body.dompdf-overlay #document * {
   flex-direction: column;
   gap: 12px;
 }
+
 .swatch-item {
   display: flex;
   align-items: center;
@@ -2307,39 +2318,52 @@ body.dompdf-overlay #document * {
   background: #f8fafc;
   border: 1px solid #e2e8f0;
 }
+
 .swatch-color {
   width: 48px;
   height: 48px;
   border-radius: 6px;
   flex-shrink: 0;
-  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.06);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.06);
 }
+
 .swatch-color-1 {
-  background-color: oklch(0.62 0.25 15); /* Vibrant Rose */
+  background-color: oklch(0.62 0.25 15);
+  /* Vibrant Rose */
 }
+
 .swatch-color-2 {
-  background-color: oklch(0.68 0.22 145); /* Vivid Mint */
+  background-color: oklch(0.68 0.22 145);
+  /* Vivid Mint */
 }
+
 .swatch-color-3 {
-  background-color: oklch(0.65 0.24 260); /* Deep Sky Blue */
+  background-color: oklch(0.65 0.24 260);
+  /* Deep Sky Blue */
 }
+
 .swatch-color-4 {
-  background-color: oklch(0.78 0.16 85); /* Warm Amber */
+  background-color: oklch(0.78 0.16 85);
+  /* Warm Amber */
 }
+
 .swatch-info {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+
 .swatch-info strong {
   font-size: 13.5px;
   color: #0f172a;
 }
+
 .swatch-info code {
   font-size: 11px;
   color: #64748b;
   font-family: var(--font-mono);
 }
+
 .oklch-gradient-card {
   display: flex;
   flex-direction: column;
@@ -2353,18 +2377,21 @@ body.dompdf-overlay #document * {
   overflow: hidden;
   box-shadow: 0 4px 20px -2px rgba(109, 40, 217, 0.15);
 }
+
 .oklch-gradient-card::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at 80% 20%, rgba(255,255,255,0.15) 0%, transparent 60%);
+  background: radial-gradient(circle at 80% 20%, rgba(255, 255, 255, 0.15) 0%, transparent 60%);
   pointer-events: none;
 }
+
 .oklch-gradient-title {
   font-size: 20px;
   font-weight: 700;
-  text-shadow: 0 2px 4px rgba(0,0,0,0.15);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
 }
+
 .oklch-gradient-code {
   font-family: var(--font-mono);
   font-size: 11.5px;
@@ -2373,7 +2400,7 @@ body.dompdf-overlay #document * {
   border-radius: 6px;
   backdrop-filter: blur(4px);
   align-self: flex-start;
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 /* Pseudo Elements & Classes Demos */
@@ -2382,6 +2409,7 @@ body.dompdf-overlay #document * {
   flex-direction: column;
   gap: 16px;
 }
+
 .pseudo-card-info {
   position: relative;
   padding: 16px 20px;
@@ -2389,6 +2417,7 @@ body.dompdf-overlay #document * {
   border-left: 4px solid #2563eb;
   border-radius: 0 8px 8px 0;
 }
+
 .pseudo-card-info::before {
   content: "💡 TECHNICAL NOTE";
   display: block;
@@ -2398,6 +2427,7 @@ body.dompdf-overlay #document * {
   margin-bottom: 6px;
   letter-spacing: 0.05em;
 }
+
 .pseudo-card-warn {
   position: relative;
   padding: 16px 20px;
@@ -2405,6 +2435,7 @@ body.dompdf-overlay #document * {
   border-left: 4px solid #d97706;
   border-radius: 0 8px 8px 0;
 }
+
 .pseudo-card-warn::before {
   content: "⚠️ PERFORMANCE WARNING";
   display: block;
@@ -2414,12 +2445,14 @@ body.dompdf-overlay #document * {
   margin-bottom: 6px;
   letter-spacing: 0.05em;
 }
+
 .pseudo-inline-quote {
   font-style: italic;
   color: #475569;
   position: relative;
   padding: 0 10px;
 }
+
 .pseudo-inline-quote::before {
   content: "“";
   font-size: 28px;
@@ -2429,6 +2462,7 @@ body.dompdf-overlay #document * {
   top: -10px;
   font-family: serif;
 }
+
 .pseudo-inline-quote::after {
   content: "”";
   font-size: 28px;
@@ -2438,12 +2472,14 @@ body.dompdf-overlay #document * {
   bottom: -22px;
   font-family: serif;
 }
+
 .fancy-link {
   color: #2563eb;
   text-decoration: none;
   font-weight: 500;
   position: relative;
 }
+
 .fancy-link::after {
   content: " ↗";
   font-size: 0.9em;
@@ -2454,6 +2490,9 @@ body.dompdf-overlay #document * {
 /* Form Controls Demo */
 .form-demo-card {
   gap: 16px;
+  border: none;
+  background: transparent;
+  padding: 0;
 }
 
 .form-demo-grid {
@@ -2527,10 +2566,10 @@ body.dompdf-overlay #document * {
   align-items: center;
   flex-wrap: wrap;
   gap: 10px 16px;
-  padding: 12px 14px;
-  border: 1px solid #e2e8f0;
-  border-radius: 12px;
-  background: #f8fafc;
+  padding: 6px 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
 }
 
 .form-demo-row-title {
@@ -2568,6 +2607,7 @@ body.dompdf-overlay #document * {
 }
 
 @media (max-width: 900px) {
+
   .form-demo-grid,
   .form-meter-grid {
     grid-template-columns: 1fr;
