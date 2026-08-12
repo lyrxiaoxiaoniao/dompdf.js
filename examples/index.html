@@ -133,9 +133,9 @@
         <div class="sidebar-section" id="sidebar-benchmark-section">
           <div class="sidebar-section-title">生成页数</div>
           <div class="benchmark-control-group">
-            <div class="benchmark-mode-switch" role="tablist" aria-label="7页">
+            <div class="benchmark-mode-switch" role="tablist" aria-label="9页">
               <button class="benchmark-mode-btn active" id="benchmark-mode-light"
-                onclick="setBenchmarkMode('light')">7页</button>
+                onclick="setBenchmarkMode('light')">9页</button>
               <button class="benchmark-mode-btn" id="benchmark-mode-heavy"
                 onclick="setBenchmarkMode('heavy')">500页</button>
               <button class="benchmark-mode-btn" id="benchmark-mode-extreme"
@@ -940,37 +940,120 @@
                 </section>
                 <section class="report-card">
                   <h3 id="sec-03-card-2-title">矢量趋势图</h3>
-                  <svg class="report-svg-figure" viewBox="0 0 640 220" aria-label="Trend chart">
-                    <rect x="0" y="0" width="640" height="220" rx="12" fill="#ffffff" />
-                    <g stroke="#e2e8f0" stroke-width="1">
-                      <line x1="60" y1="40" x2="600" y2="40" />
-                      <line x1="60" y1="90" x2="600" y2="90" />
-                      <line x1="60" y1="140" x2="600" y2="140" />
-                      <line x1="60" y1="190" x2="600" y2="190" />
+                  <svg class="report-svg-figure" viewBox="0 0 640 250" aria-label="Vector Multi-Metric Dashboard Chart">
+                    <defs>
+                      <linearGradient id="svgGradPrimary" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#6366f1" stop-opacity="0.38" />
+                        <stop offset="100%" stop-color="#6366f1" stop-opacity="0.0" />
+                      </linearGradient>
+                      <linearGradient id="svgGradAccent" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#10b981" stop-opacity="0.25" />
+                        <stop offset="100%" stop-color="#10b981" stop-opacity="0.0" />
+                      </linearGradient>
+                      <linearGradient id="svgBarGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.8" />
+                        <stop offset="100%" stop-color="#c084fc" stop-opacity="0.2" />
+                      </linearGradient>
+                    </defs>
+
+                    <!-- Background Card -->
+                    <rect x="0" y="0" width="640" height="250" rx="12" fill="#ffffff" stroke="#e2e8f0"
+                      stroke-width="1" />
+
+                    <!-- Header & Legend -->
+                    <text x="28" y="32" fill="#0f172a" font-size="14" font-weight="700"
+                      font-family="Inter, system-ui, sans-serif">Design System Adoption &amp; Performance Index</text>
+                    <g font-size="11" font-family="Inter, system-ui, sans-serif" font-weight="500">
+                      <circle cx="360" cy="27" r="4.5" fill="#6366f1" />
+                      <text x="370" y="31" fill="#475569">Adoption Rate</text>
+                      <circle cx="465" cy="27" r="4.5" fill="#10b981" />
+                      <text x="475" y="31" fill="#475569">Performance</text>
+                      <rect x="565" cy="23" width="9" height="9" rx="2" fill="#8b5cf6" opacity="0.8" />
+                      <text x="579" y="31" fill="#475569">Volume</text>
                     </g>
-                    <g fill="#2563eb" opacity="0.12">
-                      <polygon points="90,160 180,120 270,130 360,80 450,100 540,60 600,60 600,190 90,190" />
+
+                    <!-- Grid Lines & Y Axis -->
+                    <g stroke="#f1f5f9" stroke-width="1" stroke-dasharray="3 3">
+                      <line x1="50" y1="60" x2="610" y2="60" />
+                      <line x1="50" y1="100" x2="610" y2="100" />
+                      <line x1="50" y1="140" x2="610" y2="140" />
+                      <line x1="50" y1="180" x2="610" y2="180" />
                     </g>
-                    <polyline fill="none" stroke="#2563eb" stroke-width="3" stroke-linecap="round"
-                      stroke-linejoin="round" points="90,160 180,120 270,130 360,80 450,100 540,60" />
-                    <g fill="#2563eb">
-                      <circle cx="90" cy="160" r="5" />
-                      <circle cx="180" cy="120" r="5" />
-                      <circle cx="270" cy="130" r="5" />
-                      <circle cx="360" cy="80" r="5" />
-                      <circle cx="450" cy="100" r="5" />
-                      <circle cx="540" cy="60" r="5" />
+                    <g fill="#94a3b8" font-size="10" font-family="Inter, system-ui, sans-serif" text-anchor="end">
+                      <text x="42" y="64">100%</text>
+                      <text x="42" y="104">75%</text>
+                      <text x="42" y="144">50%</text>
+                      <text x="42" y="184">25%</text>
                     </g>
-                    <g fill="#64748b" font-size="11" font-family="Inter, Arial, sans-serif">
-                      <text x="78" y="208">Q1</text>
-                      <text x="168" y="208">Q2</text>
-                      <text x="258" y="208">Q3</text>
-                      <text x="348" y="208">Q4</text>
-                      <text x="432" y="208">Q5</text>
-                      <text x="522" y="208">Q6</text>
+
+                    <!-- Target SLA Threshold Line -->
+                    <line x1="50" y1="84" x2="610" y2="84" stroke="#f43f5e" stroke-width="1.5" stroke-dasharray="4 4"
+                      opacity="0.75" />
+                    <rect x="548" y="74" width="58" height="18" rx="4" fill="#fff1f2" stroke="#fecdd3"
+                      stroke-width="1" />
+                    <text x="577" y="87" fill="#e11d48" font-size="9" font-weight="700"
+                      font-family="Inter, system-ui, sans-serif" text-anchor="middle">SLA 85%</text>
+
+                    <!-- Bar Chart Series (Volume) -->
+                    <g fill="url(#svgBarGrad)">
+                      <rect x="76" y="145" width="28" height="65" rx="4" />
+                      <rect x="168" y="125" width="28" height="85" rx="4" />
+                      <rect x="260" y="110" width="28" height="100" rx="4" />
+                      <rect x="352" y="90" width="28" height="120" rx="4" />
+                      <rect x="444" y="75" width="28" height="135" rx="4" />
+                      <rect x="536" y="65" width="28" height="145" rx="4" />
                     </g>
-                    <text x="60" y="24" fill="#0f172a" font-size="15" font-weight="700"
-                      font-family="Inter, Arial, sans-serif">Adoption Rate Across Quarters</text>
+
+                    <!-- Area Fill 1: Primary Adoption -->
+                    <polygon fill="url(#svgGradPrimary)"
+                      points="90,165 182,130 274,120 366,85 458,95 550,68 550,210 90,210" />
+                    <!-- Area Fill 2: Performance Index -->
+                    <polygon fill="url(#svgGradAccent)"
+                      points="90,178 182,150 274,135 366,110 458,90 550,78 550,210 90,210" />
+
+                    <!-- Line 2: Performance Index (Emerald) -->
+                    <polyline fill="none" stroke="#10b981" stroke-width="2.5" stroke-linecap="round"
+                      stroke-linejoin="round" points="90,178 182,150 274,135 366,110 458,90 550,78" />
+                    <g fill="#ffffff" stroke="#10b981" stroke-width="2">
+                      <circle cx="90" cy="178" r="3.5" />
+                      <circle cx="182" cy="150" r="3.5" />
+                      <circle cx="274" cy="135" r="3.5" />
+                      <circle cx="366" cy="110" r="3.5" />
+                      <circle cx="458" cy="90" r="3.5" />
+                      <circle cx="550" cy="78" r="3.5" />
+                    </g>
+
+                    <!-- Line 1: Primary Adoption (Indigo) -->
+                    <polyline fill="none" stroke="#6366f1" stroke-width="3" stroke-linecap="round"
+                      stroke-linejoin="round" points="90,165 182,130 274,120 366,85 458,95 550,68" />
+                    <g fill="#6366f1">
+                      <circle cx="90" cy="165" r="5" stroke="#ffffff" stroke-width="2" />
+                      <circle cx="182" cy="130" r="5" stroke="#ffffff" stroke-width="2" />
+                      <circle cx="274" cy="120" r="5" stroke="#ffffff" stroke-width="2" />
+                      <circle cx="366" cy="85" r="5" stroke="#ffffff" stroke-width="2" />
+                      <circle cx="458" cy="95" r="5" stroke="#ffffff" stroke-width="2" />
+                      <circle cx="550" cy="68" r="5" stroke="#ffffff" stroke-width="2" />
+                    </g>
+
+                    <!-- Value Labels -->
+                    <g font-size="10" font-weight="700" font-family="Inter, system-ui, sans-serif" text-anchor="middle">
+                      <text x="366" y="74" fill="#4f46e5">88%</text>
+                      <text x="550" y="57" fill="#4f46e5">96%</text>
+                    </g>
+
+                    <!-- X Axis Labels -->
+                    <g fill="#64748b" font-size="11" font-weight="500" font-family="Inter, system-ui, sans-serif"
+                      text-anchor="middle">
+                      <text x="90" y="228">Q1 H1</text>
+                      <text x="182" y="228">Q2 H1</text>
+                      <text x="274" y="228">Q3 H2</text>
+                      <text x="366" y="228">Q4 H2</text>
+                      <text x="458" y="228">Q5 Target</text>
+                      <text x="550" y="228">Q6 Peak</text>
+                    </g>
+
+                    <!-- Baseline Axis -->
+                    <line x1="50" y1="210" x2="610" y2="210" stroke="#cbd5e1" stroke-width="1.5" />
                   </svg>
                   <p class="report-figure-caption" id="sec-03-caption">
                     图表中的文字、折线与填充区域均为矢量对象，导出后可单独选择与搜索，不会出现截图引擎常见的像素化问题。
@@ -1335,8 +1418,7 @@
                 </div>
               </div>
               <div class="report-card">
-                <img id="sample-img" class="report-raster-image" alt="raster sample for export validation"
-                  style="height: 220px;" />
+                <img id="sample-img" class="report-raster-image" alt="raster sample for export validation" />
                 <p class="report-figure-caption" id="sec-09-caption">
                   该图为 JPEG 位图样本，用来确认非矢量资源在导出后的颜色、尺寸与压缩表现。
                 </p>
