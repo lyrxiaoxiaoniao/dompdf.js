@@ -31,7 +31,14 @@ import {
 // module is bundled separately and wrapped in a Blob URL, no extra chunk file.
 import Dom2pdfWorker from './worker?worker&inline';
 
-export type { ExportOptions, ExportProgress, ExportProgressStage } from './snapshot';
+export type {
+  ExportOptions,
+  ExportProgress,
+  ExportProgressStage,
+  FormInclude,
+  FormMode,
+  FormOptions,
+} from './snapshot';
 export {
   collectSnapshot,
   collectSnapshotData,
@@ -72,6 +79,29 @@ let worker: Worker | null = null;
 let seq = 0;
 const pending = new Map<number, PendingRequest>();
 
+// #region debug-point C-D-E:pdf-gen-slow-instrumentation
+function postRenderDebugPerfEvent(
+  hypothesisId: 'A' | 'B' | 'C' | 'D' | 'E',
+  location: string,
+  msg: string,
+  data: Record<string, unknown>,
+): void {
+  fetch('http://127.0.0.1:7777/event', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      sessionId: 'pdf-gen-slow',
+      runId: 'pre-fix',
+      hypothesisId,
+      location,
+      msg: `[DEBUG] ${msg}`,
+      data,
+      ts: Date.now(),
+    }),
+  }).catch(() => {});
+}
+// #endregion
+
 interface WorkerResultResponse {
   type: 'result';
   id: number;
@@ -90,6 +120,7 @@ type WorkerMessage = WorkerResultResponse | WorkerProgressResponse;
 
 interface PendingRequest {
   resolve: (res: WorkerResultResponse) => void;
+  reject: (err: Error) => void;
   onProgress?: (progress: ExportProgress) => void;
 }
 
@@ -121,6 +152,12 @@ function getWorker(): Worker {
     };
     worker.onerror = (e) => {
       console.error('dompdf worker error', e);
+      // Reject all in-flight requests so their Promises and closures (snapshot
+      // buffers, onProgress) can be released instead of hanging forever.
+      const err = new Error('dompdf worker crashed');
+      for (const req of pending.values()) req.reject(err);
+      pending.clear();
+      worker = null;
     };
   }
   return worker;
@@ -134,8 +171,8 @@ function callWorker(
   },
 ): Promise<WorkerResultResponse> {
   const id = ++seq;
-  return new Promise((resolve) => {
-    pending.set(id, { resolve, onProgress: options?.onProgress });
+  return new Promise<WorkerResultResponse>((resolve, reject) => {
+    pending.set(id, { resolve, reject, onProgress: options?.onProgress });
     // Transfer the snapshot buffer (we don't need it on the main thread after).
     const transfer = snapshot.buffer.byteLength > 0 ? [snapshot.buffer] : [];
     getWorker().postMessage({ id, op, snapshot }, transfer);
@@ -158,7 +195,6 @@ async function buildSnapshot(
   const needsTotalPages = pagination && (
     needsPerPageHF
     || needsPerPageWatermark
-    || typeof options.onProgress === 'function'
   );
 
   let totalPages = 1;
@@ -216,17 +252,22 @@ export async function renderToBytes(
   options?: ExportOptions,
 ): Promise<Uint8Array> {
   const resolvedOptions = options ?? {};
+  const renderStartedAt = performance.now();
+  const buildStartedAt = performance.now();
   const { snapshot, totalPages } = await buildSnapshot(root, resolvedOptions);
+  const buildMs = performance.now() - buildStartedAt;
   emitProgress(resolvedOptions.onProgress, {
     stage: 'rendering',
     totalPages,
   });
+  const workerStartedAt = performance.now();
   const res = await callWorker(snapshot, 'render', {
     onProgress: (progress) => emitProgress(resolvedOptions.onProgress, {
       ...progress,
       totalPages: progress.totalPages ?? totalPages,
     }),
   });
+  const workerMs = performance.now() - workerStartedAt;
   if (!res.ok || !res.result || typeof res.result === 'string') {
     throw new Error(res.error || 'render failed');
   }
@@ -234,6 +275,13 @@ export async function renderToBytes(
     stage: 'done',
     totalPages,
     currentPage: totalPages,
+  });
+  postRenderDebugPerfEvent('D', 'src/index.ts:renderToBytes', 'render pipeline timing', {
+    totalMs: +(performance.now() - renderStartedAt).toFixed(2),
+    buildSnapshotMs: +buildMs.toFixed(2),
+    workerRenderMs: +workerMs.toFixed(2),
+    totalPages,
+    snapshotBytes: snapshot.byteLength,
   });
   return res.result as Uint8Array;
 }

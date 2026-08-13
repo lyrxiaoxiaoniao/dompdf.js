@@ -4,7 +4,7 @@
 //!
 //! Header:
 //!   magic: 4 bytes = "D2P1"
-//!   version: u32 = 10
+//!   version: u32 = 12
 //!   pageWidthPt, pageHeightPt, marginTop, marginRight, marginBottom, marginLeft: f32
 //!
 //! Config block:
@@ -56,6 +56,16 @@
 //!     if kind==text: textLen u32 + utf8 ; lineCount u32 ;
 //!                    lines: lineCount x (x,y,w,h f32 ; start u32 ; end u32)
 //!
+//! Form fields (v11+):
+//!   formFieldCount: u32
+//!   formFields[formFieldCount]: each ->
+//!     id: u32, nodeId: u32, kind: u8, interactiveKind: u8, textAlign: u8,
+//!     flags: u16,
+//!     paddingTop/right/bottom/left: f32,
+//!     name/value/defaultValue/placeholder: u32 len + utf8,
+//!     optionCount: u32,
+//!     options[optionCount]: label u32+utf8 ; value u32+utf8 ; selected u8
+//!
 //! Images (imageCount): each ->
 //!   id u32 ; width u32 ; height u32 ; format u8 ; byteLen u32 ; bytes[byteLen]
 //!   format: 0 = JPEG (DCTDecode), 1 = raw RGB888 (FlateDecode, lossless),
@@ -73,6 +83,7 @@ pub struct Snapshot {
     pub per_page_hf: Vec<PageHF>,
     pub per_page_watermark: Vec<Option<WatermarkSpec>>,
     pub nodes: Vec<Node>,
+    pub form_fields: Vec<FormField>,
     pub images: Vec<Image>,
 }
 
@@ -238,6 +249,43 @@ pub struct Image {
     pub format: u8,
     pub bytes: Vec<u8>,
 }
+
+#[derive(Clone)]
+pub struct FormFieldOption {
+    pub label: String,
+    pub value: String,
+    pub selected: bool,
+}
+
+#[derive(Clone)]
+pub struct FormField {
+    pub id: u32,
+    pub node_id: u32,
+    pub kind: u8,
+    pub interactive_kind: u8,
+    pub text_align: u8,
+    pub checked: bool,
+    pub disabled: bool,
+    pub readonly: bool,
+    pub required: bool,
+    pub multiple: bool,
+    pub placeholder_shown: bool,
+    pub password: bool,
+    pub name: String,
+    pub value: String,
+    pub default_value: String,
+    pub placeholder: String,
+    pub padding: [f32; 4],
+    pub options: Vec<FormFieldOption>,
+}
+
+pub const FORM_FLAG_CHECKED: u16 = 0x01;
+pub const FORM_FLAG_DISABLED: u16 = 0x02;
+pub const FORM_FLAG_READONLY: u16 = 0x04;
+pub const FORM_FLAG_REQUIRED: u16 = 0x08;
+pub const FORM_FLAG_MULTIPLE: u16 = 0x10;
+pub const FORM_FLAG_PLACEHOLDER_SHOWN: u16 = 0x20;
+pub const FORM_FLAG_PASSWORD: u16 = 0x40;
 
 struct Cursor<'a> {
     data: &'a [u8],
@@ -443,6 +491,54 @@ fn parse_opt_watermark(c: &mut Cursor, version: u32) -> Result<Option<WatermarkS
     })
 }
 
+fn parse_string32(c: &mut Cursor) -> Result<String, String> {
+    let len = c.u32()? as usize;
+    c.utf8(len)
+}
+
+fn parse_form_field(c: &mut Cursor) -> Result<FormField, String> {
+    let id = c.u32()?;
+    let node_id = c.u32()?;
+    let kind = c.u8()?;
+    let interactive_kind = c.u8()?;
+    let text_align = c.u8()?;
+    let flags = c.u16()?;
+    let padding = [c.f32()?, c.f32()?, c.f32()?, c.f32()?];
+    let name = parse_string32(c)?;
+    let value = parse_string32(c)?;
+    let default_value = parse_string32(c)?;
+    let placeholder = parse_string32(c)?;
+    let option_count = c.u32()?;
+    let mut options = Vec::with_capacity(option_count as usize);
+    for _ in 0..option_count {
+        options.push(FormFieldOption {
+            label: parse_string32(c)?,
+            value: parse_string32(c)?,
+            selected: c.u8()? != 0,
+        });
+    }
+    Ok(FormField {
+        id,
+        node_id,
+        kind,
+        interactive_kind,
+        text_align,
+        checked: flags & FORM_FLAG_CHECKED != 0,
+        disabled: flags & FORM_FLAG_DISABLED != 0,
+        readonly: flags & FORM_FLAG_READONLY != 0,
+        required: flags & FORM_FLAG_REQUIRED != 0,
+        multiple: flags & FORM_FLAG_MULTIPLE != 0,
+        placeholder_shown: flags & FORM_FLAG_PLACEHOLDER_SHOWN != 0,
+        password: flags & FORM_FLAG_PASSWORD != 0,
+        name,
+        value,
+        default_value,
+        placeholder,
+        padding,
+        options,
+    })
+}
+
 pub fn parse(data: &[u8]) -> Result<Snapshot, String> {
     let mut c = Cursor::new(data);
     let magic = c.bytes(4)?;
@@ -450,9 +546,9 @@ pub fn parse(data: &[u8]) -> Result<Snapshot, String> {
         return Err(format!("bad magic: {:?}", magic));
     }
     let version = c.u32()?;
-    if version != 7 && version != 8 && version != 9 && version != 10 {
+    if version != 7 && version != 8 && version != 9 && version != 10 && version != 11 && version != 12 {
         return Err(format!(
-            "unsupported version {} (expected 7, 8, 9 or 10)",
+            "unsupported version {} (expected 7, 8, 9, 10, 11 or 12)",
             version
         ));
     }
@@ -693,6 +789,17 @@ pub fn parse(data: &[u8]) -> Result<Snapshot, String> {
         });
     }
 
+    let form_fields = if version >= 11 {
+        let count = c.u32()?;
+        let mut out = Vec::with_capacity(count as usize);
+        for _ in 0..count {
+            out.push(parse_form_field(&mut c)?);
+        }
+        out
+    } else {
+        Vec::new()
+    };
+
     let image_count = c.u32()?;
     let mut images = Vec::with_capacity(image_count as usize);
     for _ in 0..image_count {
@@ -723,6 +830,7 @@ pub fn parse(data: &[u8]) -> Result<Snapshot, String> {
         per_page_hf,
         per_page_watermark,
         nodes,
+        form_fields,
         images,
     })
 }

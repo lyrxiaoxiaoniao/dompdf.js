@@ -15,7 +15,7 @@ use crate::font::{
 };
 use crate::encrypt::PdfSecurity;
 use crate::pdf::PdfWriter;
-use crate::snapshot::{BoxShadow, HFSpec, Image, Node, Snapshot, WatermarkSpec};
+use crate::snapshot::{BoxShadow, FormField, HFSpec, Image, Node, Snapshot, WatermarkSpec};
 
 pub const PX_TO_PT: f32 = 0.75;
 const ASCENT: f32 = 0.8; // approx Helvetica ascent / em, for baseline placement
@@ -61,6 +61,32 @@ pub struct PagePlan {
     pub media_h: Option<f32>,
 }
 
+#[derive(Clone)]
+struct FormPlacement {
+    field: FormField,
+    page: u32,
+    rect: (f32, f32, f32, f32),
+}
+
+const FORM_KIND_TEXT: u8 = 1;
+const FORM_KIND_TEXTAREA: u8 = 2;
+const FORM_KIND_SELECT: u8 = 3;
+const FORM_KIND_CHECKBOX: u8 = 4;
+const FORM_KIND_DATE_TIME: u8 = 6;
+
+const FORM_INTERACTIVE_TEXT: u8 = 1;
+const FORM_INTERACTIVE_CHOICE: u8 = 2;
+const FORM_INTERACTIVE_CHECKBOX: u8 = 3;
+const FORM_INTERACTIVE_RADIO: u8 = 4;
+
+const FF_READONLY: u32 = 1;
+const FF_REQUIRED: u32 = 1 << 1;
+const FF_MULTILINE: u32 = 1 << 12;
+const FF_PASSWORD: u32 = 1 << 13;
+const FF_RADIO: u32 = 1 << 15;
+const FF_COMBO: u32 = 1 << 17;
+const FF_MULTISELECT: u32 = 1 << 21;
+
 fn precision() -> u8 {
     PRECISION.with(|p| p.get())
 }
@@ -76,16 +102,27 @@ fn f(x: f32) -> String {
     if r == 0.0 {
         return "0".to_string();
     }
-    let s = format!("{:.*}", p as usize, r);
-    s.trim_end_matches('0')
-        .trim_end_matches('.')
-        .to_string()
+    // Write directly into a pre-allocated String (avoids the intermediate
+    // format! String + trim_end_matches().to_string() allocation chain).
+    use core::fmt::Write;
+    let mut s = String::with_capacity(8);
+    write!(s, "{:.*}", p as usize, r).unwrap();
+    // In-place trim of trailing zeros and dangling dot.
+    while s.ends_with('0') {
+        s.pop();
+    }
+    if s.ends_with('.') {
+        s.pop();
+    }
+    s
 }
 
 fn hex(bytes: &[u8]) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
     let mut s = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        s.push_str(&format!("{:02X}", b));
+    for &b in bytes {
+        s.push(HEX[(b >> 4) as usize] as char);
+        s.push(HEX[(b & 0x0f) as usize] as char);
     }
     s
 }
@@ -97,6 +134,205 @@ fn pdf_utf16_hex(text: &str) -> String {
         bytes.extend_from_slice(&unit.to_be_bytes());
     }
     hex(&bytes)
+}
+
+fn pdf_text_string(text: &str) -> String {
+    format!("<{}>", pdf_utf16_hex(text))
+}
+
+fn pdf_name_token(name: &str) -> String {
+    let mut out = String::new();
+    for ch in name.chars() {
+        if ch.is_ascii_alphanumeric() {
+            out.push(ch);
+        } else {
+            out.push('_');
+        }
+    }
+    if out.is_empty() {
+        "Field".to_string()
+    } else {
+        out
+    }
+}
+
+fn acro_quadding(text_align: u8) -> u8 {
+    match text_align {
+        1 => 2,
+        2 => 1,
+        _ => 0,
+    }
+}
+
+fn form_field_name(field: &FormField) -> String {
+    if field.name.trim().is_empty() {
+        format!("field_{}", field.id)
+    } else {
+        field.name.clone()
+    }
+}
+
+fn form_flags_for_field(field: &FormField) -> u32 {
+    let mut flags = 0_u32;
+    if field.readonly || field.disabled {
+        flags |= FF_READONLY;
+    }
+    if field.required {
+        flags |= FF_REQUIRED;
+    }
+    if field.kind == FORM_KIND_TEXTAREA {
+        flags |= FF_MULTILINE;
+    }
+    if field.password {
+        flags |= FF_PASSWORD;
+    }
+    if field.kind == FORM_KIND_SELECT {
+        if field.multiple {
+            flags |= FF_MULTISELECT;
+        } else {
+            flags |= FF_COMBO;
+        }
+    }
+    flags
+}
+
+fn button_flags_for_field(field: &FormField, radio: bool) -> u32 {
+    let mut flags = 0_u32;
+    if field.readonly || field.disabled {
+        flags |= FF_READONLY;
+    }
+    if field.required {
+        flags |= FF_REQUIRED;
+    }
+    if radio {
+        flags |= FF_RADIO;
+    }
+    flags
+}
+
+fn form_field_page(
+    snap: &Snapshot,
+    geo: &Geo,
+    node: &Node,
+    media_h: Option<f32>,
+) -> Option<u32> {
+    let content_h_px = content_height_px_for_page(snap, geo, media_h);
+    if content_h_px <= 0.0 {
+        return None;
+    }
+    if snap.config.single_page {
+        return Some(0);
+    }
+    let start = (node.y / content_h_px).floor().max(0.0) as u32;
+    let end = ((node.y + node.h - 1e-3) / content_h_px).floor().max(0.0) as u32;
+    if start == end { Some(start) } else { None }
+}
+
+fn collect_form_placements(snap: &Snapshot, pages: &[PagePlan]) -> Vec<FormPlacement> {
+    if snap.form_fields.is_empty() || pages.is_empty() {
+        return Vec::new();
+    }
+    let geo = compute_geo(snap);
+    let node_index_for: std::collections::HashMap<u32, usize> = snap
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(idx, node)| (node.id, idx))
+        .collect();
+    let mut out = Vec::new();
+    for field in &snap.form_fields {
+        let Some(&node_idx) = node_index_for.get(&field.node_id) else {
+            continue;
+        };
+        let node = &snap.nodes[node_idx];
+        let Some(page) = form_field_page(snap, &geo, node, pages[0].media_h) else {
+            continue;
+        };
+        let page_usize = page as usize;
+        if page_usize >= pages.len() {
+            continue;
+        }
+        let page_h_pt = page_height_pt(snap, pages[page_usize].media_h);
+        let content_h_px = content_height_px_for_page(snap, &geo, pages[page_usize].media_h);
+        let rect = rect_pt(snap, &geo, node, page, content_h_px, page_h_pt);
+        if rect.2 <= 0.0 || rect.3 <= 0.0 {
+            continue;
+        }
+        out.push(FormPlacement {
+            field: field.clone(),
+            page,
+            rect,
+        });
+    }
+    out
+}
+
+fn inset_form_rect(rect: (f32, f32, f32, f32), field: &FormField) -> (f32, f32, f32, f32) {
+    let (x, y, w, h) = rect;
+    let top = (field.padding[0] * PX_TO_PT).max(0.0);
+    let right = (field.padding[1] * PX_TO_PT).max(0.0);
+    let bottom = (field.padding[2] * PX_TO_PT).max(0.0);
+    let left = (field.padding[3] * PX_TO_PT).max(0.0);
+    let inset_x = x + left.min((w - 2.0).max(0.0));
+    let inset_y = y + bottom.min((h - 2.0).max(0.0));
+    let inset_w = (w - left - right).max(2.0);
+    let inset_h = (h - top - bottom).max(2.0);
+    (inset_x, inset_y, inset_w, inset_h)
+}
+
+fn checkbox_appearance_stream(w_pt: f32, h_pt: f32, checked: bool) -> Vec<u8> {
+    let mut out = String::new();
+    out.push_str("q\n");
+    out.push_str("1 1 1 rg\n");
+    out.push_str(&format!("0 0 {} {} re f\n", f(w_pt), f(h_pt)));
+    out.push_str("0 0 0 RG 1 w\n");
+    out.push_str(&format!("0.5 0.5 {} {} re S\n", f((w_pt - 1.0).max(0.0)), f((h_pt - 1.0).max(0.0))));
+    if checked {
+        out.push_str("0 0 0 RG 1.5 w\n");
+        let x1 = w_pt * 0.22;
+        let y1 = h_pt * 0.52;
+        let x2 = w_pt * 0.42;
+        let y2 = h_pt * 0.26;
+        let x3 = w_pt * 0.78;
+        let y3 = h_pt * 0.74;
+        out.push_str(&format!(
+            "{} {} m {} {} l {} {} l S\n",
+            f(x1), f(y1), f(x2), f(y2), f(x3), f(y3)
+        ));
+    }
+    out.push_str("Q\n");
+    out.into_bytes()
+}
+
+fn radio_appearance_stream(w_pt: f32, h_pt: f32, checked: bool) -> Vec<u8> {
+    let mut out = String::new();
+    let outer = (w_pt.min(h_pt) * 0.5 - 0.5).max(0.0);
+    out.push_str("q\n");
+    out.push_str("1 1 1 rg 0 0 0 RG 1 w\n");
+    push_rounded_rect_path(
+        &mut out,
+        (w_pt * 0.5 - outer).max(0.0),
+        (h_pt * 0.5 - outer).max(0.0),
+        (outer * 2.0).max(0.0),
+        (outer * 2.0).max(0.0),
+        [outer, outer, outer, outer],
+    );
+    out.push_str("B\n");
+    if checked {
+        let inner = outer * 0.5;
+        out.push_str("0 0 0 rg\n");
+        push_rounded_rect_path(
+            &mut out,
+            (w_pt * 0.5 - inner).max(0.0),
+            (h_pt * 0.5 - inner).max(0.0),
+            (inner * 2.0).max(0.0),
+            (inner * 2.0).max(0.0),
+            [inner, inner, inner, inner],
+        );
+        out.push_str("f\n");
+    }
+    out.push_str("Q\n");
+    out.into_bytes()
 }
 
 fn opacity_key(opacity: f32) -> u16 {
@@ -140,6 +376,10 @@ fn normalize_text_for_pdf(text: &str, preserve_whitespace: bool) -> String {
         }
     }
     out
+}
+
+fn prepare_text_for_pdf(text: &str, preserve_whitespace: bool) -> String {
+    normalize_text_for_pdf(text, preserve_whitespace)
 }
 
 fn approx_eq(a: f32, b: f32) -> bool {
@@ -433,41 +673,54 @@ fn apply_break_directives(snap: &mut Snapshot, children: &[Vec<usize>], content_
         .map(|(i, _)| i)
         .collect();
 
-    // Pass 1: pageBreak — push node to the next page boundary (strictly greater).
-    // Preorder so cascading breaks accumulate.
-    fn walk_break(
-        snap: &mut Snapshot,
-        children: &[Vec<usize>],
-        idx: usize,
-        content_h_px: f32,
-    ) {
-        let pb = snap.nodes[idx].page_break;
-        if pb {
-            let y = snap.nodes[idx].y;
-            let target = ((y / content_h_px).floor() + 1.0) * content_h_px;
-            let gap = target - y;
-            if gap > 0.0 {
-                shift_flow_tail(snap, children, idx, gap);
-            }
+    fn page_break_gap(y: f32, content_h_px: f32) -> f32 {
+        if content_h_px <= 0.0 {
+            return 0.0;
         }
-        let kids: Vec<usize> = children[idx].clone();
-        for c in kids {
-            walk_break(snap, children, c, content_h_px);
+        let page = (y / content_h_px).floor();
+        let boundary = page * content_h_px;
+        // Once a pageBreak-marked block has already landed on a boundary,
+        // keep it there; iterative divisionDisable/pageBreak passes must not
+        // keep pushing it one more full page.
+        if (y - boundary).abs() <= 0.5 {
+            return 0.0;
         }
-    }
-    for &r in &roots {
-        walk_break(snap, children, r, content_h_px);
+        let target = (page + 1.0) * content_h_px;
+        let gap = target - y;
+        if gap > 0.0 { gap } else { 0.0 }
     }
 
-    // Pass 2: divisionDisable — if a box subtree straddles a page boundary and
-    // fits within one page, move it to the next boundary. Iterate to stable.
-    let mut subtree_min_y = vec![0.0_f32; snap.nodes.len()];
-    let mut subtree_max_y = vec![0.0_f32; snap.nodes.len()];
-    for &r in &roots {
-        compute_subtree_bounds(snap, children, r, &mut subtree_min_y, &mut subtree_max_y);
-    }
+    // pageBreak and divisionDisable influence the same downstream flow. Run
+    // them together until positions stabilize so a later container move cannot
+    // invalidate an earlier pageBreak placement.
     for _ in 0..8 {
         let mut moved = false;
+        // Pass 1: pageBreak — preorder so cascading breaks accumulate.
+        fn walk_break(
+            snap: &mut Snapshot,
+            children: &[Vec<usize>],
+            idx: usize,
+            content_h_px: f32,
+            moved: &mut bool,
+        ) {
+            if snap.nodes[idx].page_break {
+                let gap = page_break_gap(snap.nodes[idx].y, content_h_px);
+                if gap > 0.0 {
+                    shift_flow_tail(snap, children, idx, gap);
+                    *moved = true;
+                }
+            }
+            let kids: Vec<usize> = children[idx].clone();
+            for c in kids {
+                walk_break(snap, children, c, content_h_px, moved);
+            }
+        }
+        for &r in &roots {
+            walk_break(snap, children, r, content_h_px, &mut moved);
+        }
+
+        // Pass 2: divisionDisable — if a box subtree straddles a page boundary
+        // and fits within one page, move it to the next boundary.
         let div_nodes: Vec<usize> = snap
             .nodes
             .iter()
@@ -751,6 +1004,62 @@ fn rect_pt(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h_px: f32
     (x0, bottom, w, h)
 }
 
+#[derive(Clone, Copy)]
+struct BoxFragment {
+    x0: f32,
+    bottom: f32,
+    w: f32,
+    h: f32,
+    first: bool,
+    last: bool,
+}
+
+fn box_fragment_pt(
+    snap: &Snapshot,
+    geo: &Geo,
+    node: &Node,
+    page: u32,
+    content_h_px: f32,
+    page_h_pt: f32,
+) -> Option<BoxFragment> {
+    let band_top = page as f32 * content_h_px;
+    let band_bottom = (page + 1) as f32 * content_h_px;
+    let frag_top_px = node.y.max(band_top);
+    let frag_bottom_px = (node.y + node.h).min(band_bottom);
+    if frag_bottom_px <= frag_top_px + 1e-3 {
+        return None;
+    }
+    let x0 = snap.margin_left + node.x * PX_TO_PT;
+    let top_pt = page_h_pt - snap.margin_top - geo.header_h_pt - (frag_top_px - band_top) * PX_TO_PT;
+    let w = node.w * PX_TO_PT;
+    let h = (frag_bottom_px - frag_top_px) * PX_TO_PT;
+    Some(BoxFragment {
+        x0,
+        bottom: top_pt - h,
+        w,
+        h,
+        first: frag_top_px <= node.y + 1e-3,
+        last: frag_bottom_px >= node.y + node.h - 1e-3,
+    })
+}
+
+fn fragment_radii_pt(node: &Node, w: f32, h: f32, first: bool, last: bool) -> Option<[f32; 4]> {
+    let mut radii = rounded_rect_radii_pt(node, w, h)?;
+    if !first {
+        radii[0] = 0.0;
+        radii[1] = 0.0;
+    }
+    if !last {
+        radii[2] = 0.0;
+        radii[3] = 0.0;
+    }
+    if radii.iter().all(|r| *r <= 0.0) {
+        None
+    } else {
+        Some(radii)
+    }
+}
+
 fn find_image<'a>(snap: &'a Snapshot, image_id: u32) -> Option<&'a Image> {
     snap.images.iter().find(|img| img.id == image_id)
 }
@@ -826,18 +1135,19 @@ fn draw_node(
             let clip = vis && node.overflow_hidden;
             if clip {
                 out.push_str("q\n");
-                let (x0, bottom, w, h) = rect_pt(snap, &geo, node, page, content_h_px, page_h_pt);
-                if let Some(radii) = rounded_rect_radii_pt(node, w, h) {
-                    push_rounded_rect_path(out, x0, bottom, w, h, radii);
-                    out.push_str("W n\n");
-                } else {
-                    out.push_str(&format!(
-                        "{} {} {} {} re W n\n",
-                        f(x0),
-                        f(bottom),
-                        f(w),
-                        f(h)
-                    ));
+                if let Some(frag) = box_fragment_pt(snap, &geo, node, page, content_h_px, page_h_pt) {
+                    if let Some(radii) = fragment_radii_pt(node, frag.w, frag.h, frag.first, frag.last) {
+                        push_rounded_rect_path(out, frag.x0, frag.bottom, frag.w, frag.h, radii);
+                        out.push_str("W n\n");
+                    } else {
+                        out.push_str(&format!(
+                            "{} {} {} {} re W n\n",
+                            f(frag.x0),
+                            f(frag.bottom),
+                            f(frag.w),
+                            f(frag.h)
+                        ));
+                    }
                 }
             }
             for &c in children[idx].iter() {
@@ -914,17 +1224,25 @@ fn draw_node(
 }
 
 fn draw_box_bg(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h_px: f32, page_h_pt: f32, out: &mut String) {
-    let (x0, bottom, w, h) = rect_pt(snap, geo, node, page, content_h_px, page_h_pt);
-    let radii = rounded_rect_radii_pt(node, w, h);
+    let Some(frag) = box_fragment_pt(snap, geo, node, page, content_h_px, page_h_pt) else {
+        return;
+    };
+    let radii = fragment_radii_pt(node, frag.w, frag.h, frag.first, frag.last);
     if let Some(bg) = node.bg {
         if bg[3] > 0.001 {
             out.push_str("q\n");
             out.push_str(&format!("{} {} {} rg\n", f(bg[0]), f(bg[1]), f(bg[2])));
             if let Some(radii) = radii {
-                push_rounded_rect_path(out, x0, bottom, w, h, radii);
+                push_rounded_rect_path(out, frag.x0, frag.bottom, frag.w, frag.h, radii);
                 out.push_str("f\n");
             } else {
-                out.push_str(&format!("{} {} {} {} re f\n", f(x0), f(bottom), f(w), f(h)));
+                out.push_str(&format!(
+                    "{} {} {} {} re f\n",
+                    f(frag.x0),
+                    f(frag.bottom),
+                    f(frag.w),
+                    f(frag.h)
+                ));
             }
             out.push_str("Q\n");
         }
@@ -935,15 +1253,17 @@ fn draw_box_shadow(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
     if node.shadow.is_empty() {
         return;
     }
-    let (x0, bottom, w, h) = rect_pt(snap, geo, node, page, content_h_px, page_h_pt);
-    let base_radii = rounded_rect_radii_pt(node, w, h);
+    let Some(frag) = box_fragment_pt(snap, geo, node, page, content_h_px, page_h_pt) else {
+        return;
+    };
+    let base_radii = fragment_radii_pt(node, frag.w, frag.h, frag.first, frag.last);
     // CSS paints shadow layers first-to-last with earlier layers on top, so draw
     // in reverse order to stack them correctly.
     for shadow in node.shadow.iter().rev() {
         if shadow.color[3] <= 0.001 {
             continue;
         }
-        draw_one_shadow(shadow, x0, bottom, w, h, base_radii, out);
+        draw_one_shadow(shadow, frag.x0, frag.bottom, frag.w, frag.h, base_radii, out);
     }
 }
 
@@ -1015,59 +1335,74 @@ fn draw_one_shadow(
 }
 
 fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h_px: f32, page_h_pt: f32, out: &mut String) {
-    let (x0, bottom, w, h) = rect_pt(snap, geo, node, page, content_h_px, page_h_pt);
-    let radii = rounded_rect_radii_pt(node, w, h);
+    let Some(frag) = box_fragment_pt(snap, geo, node, page, content_h_px, page_h_pt) else {
+        return;
+    };
+    let x0 = frag.x0;
+    let bottom = frag.bottom;
+    let w = frag.w;
+    let h = frag.h;
+    let radii = fragment_radii_pt(node, w, h, frag.first, frag.last);
     if let Some(b) = &node.border {
+        let mut widths = b.w;
+        if !frag.first {
+            widths[0] = 0.0;
+        }
+        if !frag.last {
+            widths[2] = 0.0;
+        }
         // Rounded-rect fast path: when width, style, radii AND color are uniform
         // across all four sides, draw the border ring as a fill instead of
         // centering a stroke on the outer edge. Browser borders live inside the
         // border box; stroking the outer path loses half the line outside the box
         // and makes thin top borders look missing in raster comparisons.
-        if let (Some(radii), Some(bw), Some(style), Some(col)) = (
-            radii,
-            uniform_border_width_pt(node),
-            uniform_border_style(node),
-            uniform_border_color(node),
-        ) {
-            let alpha = col[3];
-            let use_alpha = alpha > 0.0 && alpha < 0.999;
-            if use_alpha {
-                out.push_str("q\n");
-                out.push_str(&format!("/{} gs\n", opacity_resource_name(opacity_key(alpha))));
-            }
-            if style == BORDER_SOLID {
-                out.push_str(&format!("{} {} {} rg\n", f(col[0]), f(col[1]), f(col[2])));
-                push_rounded_rect_path(out, x0, bottom, w, h, radii);
-                let inner_x = x0 + bw;
-                let inner_bottom = bottom + bw;
-                let inner_w = (w - bw * 2.0).max(0.0);
-                let inner_h = (h - bw * 2.0).max(0.0);
-                if inner_w > 0.01 && inner_h > 0.01 {
-                    if let Some(inner_radii) = inset_radii(radii, bw) {
-                        push_rounded_rect_path(out, inner_x, inner_bottom, inner_w, inner_h, inner_radii);
-                    } else {
-                        out.push_str(&format!(
-                            "{} {} {} {} re\n",
-                            f(inner_x),
-                            f(inner_bottom),
-                            f(inner_w),
-                            f(inner_h)
-                        ));
-                    }
+        if frag.first && frag.last {
+            if let (Some(radii), Some(bw), Some(style), Some(col)) = (
+                radii,
+                uniform_border_width_pt(node),
+                uniform_border_style(node),
+                uniform_border_color(node),
+            ) {
+                let alpha = col[3];
+                let use_alpha = alpha > 0.0 && alpha < 0.999;
+                if use_alpha {
+                    out.push_str("q\n");
+                    out.push_str(&format!("/{} gs\n", opacity_resource_name(opacity_key(alpha))));
                 }
-                out.push_str("f*\n");
-            } else {
-                // Dashed borders still rely on stroke semantics.
-                out.push_str(&format!("{} {} {} RG {} w\n", f(col[0]), f(col[1]), f(col[2]), f(bw)));
-                set_dash(out, style, bw);
-                push_rounded_rect_path(out, x0, bottom, w, h, radii);
-                out.push_str("S\n");
-                out.push_str("[] 0 d\n");
+                if style == BORDER_SOLID {
+                    out.push_str(&format!("{} {} {} rg\n", f(col[0]), f(col[1]), f(col[2])));
+                    push_rounded_rect_path(out, x0, bottom, w, h, radii);
+                    let inner_x = x0 + bw;
+                    let inner_bottom = bottom + bw;
+                    let inner_w = (w - bw * 2.0).max(0.0);
+                    let inner_h = (h - bw * 2.0).max(0.0);
+                    if inner_w > 0.01 && inner_h > 0.01 {
+                        if let Some(inner_radii) = inset_radii(radii, bw) {
+                            push_rounded_rect_path(out, inner_x, inner_bottom, inner_w, inner_h, inner_radii);
+                        } else {
+                            out.push_str(&format!(
+                                "{} {} {} {} re\n",
+                                f(inner_x),
+                                f(inner_bottom),
+                                f(inner_w),
+                                f(inner_h)
+                            ));
+                        }
+                    }
+                    out.push_str("f*\n");
+                } else {
+                    // Dashed borders still rely on stroke semantics.
+                    out.push_str(&format!("{} {} {} RG {} w\n", f(col[0]), f(col[1]), f(col[2]), f(bw)));
+                    set_dash(out, style, bw);
+                    push_rounded_rect_path(out, x0, bottom, w, h, radii);
+                    out.push_str("S\n");
+                    out.push_str("[] 0 d\n");
+                }
+                if use_alpha {
+                    out.push_str("Q\n");
+                }
+                return;
             }
-            if use_alpha {
-                out.push_str("Q\n");
-            }
-            return;
         }
         let top_pt = bottom + h;
         let right = x0 + w;
@@ -1100,8 +1435,30 @@ fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
             out.push_str(&format!("{} {} {} {} re f\n", f(rx), f(ry), f(rw), f(rh)));
             out.push_str("Q\n");
         };
-        // Per-side stroke. Each side carries its own color (and its own alpha,
-        // wrapped in its own ExtGState so rgba() borders stay translucent).
+        let fill_side_rect = |side: usize, bw_px: f32, col: &[f32; 4], out: &mut String| {
+            if bw_px <= 0.0 {
+                return;
+            }
+            let alpha = col[3];
+            if alpha <= 0.001 {
+                return;
+            }
+            let bw = bw_px * PX_TO_PT;
+            let (rx, ry, rw, rh) = match side {
+                0 => (x0, top_pt - bw, w, bw),
+                1 => (right - bw, bottom, bw, h),
+                2 => (x0, bottom, w, bw),
+                3 => (x0, bottom, bw, h),
+                _ => return,
+            };
+            out.push_str("q\n");
+            if alpha < 0.999 {
+                out.push_str(&format!("/{} gs\n", opacity_resource_name(opacity_key(alpha))));
+            }
+            out.push_str(&format!("{} {} {} rg\n", f(col[0]), f(col[1]), f(col[2])));
+            out.push_str(&format!("{} {} {} {} re f\n", f(rx), f(ry), f(rw), f(rh)));
+            out.push_str("Q\n");
+        };
         let stroke_side = |bw_px: f32, style: u8, col: &[f32; 4], path: &str, out: &mut String| {
             if bw_px <= 0.0 {
                 return;
@@ -1121,42 +1478,54 @@ fn draw_box_border(snap: &Snapshot, geo: &Geo, node: &Node, page: u32, content_h
                 out.push_str("Q\n");
             }
         };
-        // top
-        if radii.is_some() && b.s[0] == BORDER_SOLID {
-            fill_side_with_clip(0, b.w[0], &b.c[0], out);
+        if b.s[0] == BORDER_SOLID {
+            if radii.is_some() {
+                fill_side_with_clip(0, widths[0], &b.c[0], out);
+            } else {
+                fill_side_rect(0, widths[0], &b.c[0], out);
+            }
         } else {
             stroke_side(
-                b.w[0], b.s[0], &b.c[0],
+                widths[0], b.s[0], &b.c[0],
                 &format!("{} {} m {} {} l S\n", f(x0), f(top_pt), f(right), f(top_pt)),
                 out,
             );
         }
-        // right
-        if radii.is_some() && b.s[1] == BORDER_SOLID {
-            fill_side_with_clip(1, b.w[1], &b.c[1], out);
+        if b.s[1] == BORDER_SOLID {
+            if radii.is_some() {
+                fill_side_with_clip(1, widths[1], &b.c[1], out);
+            } else {
+                fill_side_rect(1, widths[1], &b.c[1], out);
+            }
         } else {
             stroke_side(
-                b.w[1], b.s[1], &b.c[1],
+                widths[1], b.s[1], &b.c[1],
                 &format!("{} {} m {} {} l S\n", f(right), f(top_pt), f(right), f(bottom)),
                 out,
             );
         }
-        // bottom
-        if radii.is_some() && b.s[2] == BORDER_SOLID {
-            fill_side_with_clip(2, b.w[2], &b.c[2], out);
+        if b.s[2] == BORDER_SOLID {
+            if radii.is_some() {
+                fill_side_with_clip(2, widths[2], &b.c[2], out);
+            } else {
+                fill_side_rect(2, widths[2], &b.c[2], out);
+            }
         } else {
             stroke_side(
-                b.w[2], b.s[2], &b.c[2],
+                widths[2], b.s[2], &b.c[2],
                 &format!("{} {} m {} {} l S\n", f(x0), f(bottom), f(right), f(bottom)),
                 out,
             );
         }
-        // left
-        if radii.is_some() && b.s[3] == BORDER_SOLID {
-            fill_side_with_clip(3, b.w[3], &b.c[3], out);
+        if b.s[3] == BORDER_SOLID {
+            if radii.is_some() {
+                fill_side_with_clip(3, widths[3], &b.c[3], out);
+            } else {
+                fill_side_rect(3, widths[3], &b.c[3], out);
+            }
         } else {
             stroke_side(
-                b.w[3], b.s[3], &b.c[3],
+                widths[3], b.s[3], &b.c[3],
                 &format!("{} {} m {} {} l S\n", f(x0), f(top_pt), f(x0), f(bottom)),
                 out,
             );
@@ -1250,7 +1619,7 @@ fn collect_used_cid_gids(snap: &Snapshot, fontctx: &FontCtx, total: u32) {
             if e <= s {
                 continue;
             }
-            let normalized = normalize_text_for_pdf(&txt[s..e], font.preserve_whitespace);
+            let normalized = prepare_text_for_pdf(&txt[s..e], font.preserve_whitespace);
             if normalized.is_empty() {
                 continue;
             }
@@ -1336,7 +1705,7 @@ fn draw_text_lines(
         if seg.is_empty() {
             continue;
         }
-        let normalized = normalize_text_for_pdf(seg, font.preserve_whitespace);
+        let normalized = prepare_text_for_pdf(seg, font.preserve_whitespace);
         if normalized.is_empty() {
             continue;
         }
@@ -2061,7 +2430,7 @@ pub fn build_pdf(
         }
 
         // FontFile2
-        let used = cf.used_gids.borrow();
+        let used: Vec<u16> = cf.used_gids.borrow().iter().copied().collect();
         let embed = cf.ttf.embed_bytes(&used);
         if compress {
             let ff2_comp = crate::deflate::zlib_deflate(&embed);
@@ -2125,6 +2494,219 @@ pub fn build_pdf(
         w.indirect(oid, &body);
     }
 
+    let form_placements = collect_form_placements(snap, pages);
+    let acroform_id = if form_placements.is_empty() {
+        None
+    } else {
+        Some(w.alloc(1))
+    };
+    let mut page_annots: Vec<Vec<u32>> = vec![Vec::new(); page_count as usize];
+    let mut top_level_field_ids: Vec<u32> = Vec::new();
+    let mut radio_groups: std::collections::BTreeMap<String, Vec<FormPlacement>> =
+        std::collections::BTreeMap::new();
+
+    for placement in form_placements {
+        match placement.field.interactive_kind {
+            FORM_INTERACTIVE_RADIO => {
+                let group_key = if placement.field.name.trim().is_empty() {
+                    format!("__radio_{}", placement.field.id)
+                } else {
+                    placement.field.name.clone()
+                };
+                radio_groups.entry(group_key).or_default().push(placement);
+            }
+            FORM_INTERACTIVE_CHECKBOX => {
+                let off_id = w.alloc(1);
+                let on_id = w.alloc(1);
+                let widget_id = w.alloc(1);
+                let (_, _, w_pt, h_pt) = placement.rect;
+                w.stream(off_id, &format!(" /Type /XObject /Subtype /Form /BBox [0 0 {} {}]", f(w_pt), f(h_pt)), &checkbox_appearance_stream(w_pt, h_pt, false));
+                w.stream(on_id, &format!(" /Type /XObject /Subtype /Form /BBox [0 0 {} {}]", f(w_pt), f(h_pt)), &checkbox_appearance_stream(w_pt, h_pt, true));
+                let field_name = pdf_text_string(&form_field_name(&placement.field));
+                let (x, bottom, width, height) = placement.rect;
+                let state = if placement.field.checked { "/Yes" } else { "/Off" };
+                let flags = button_flags_for_field(&placement.field, false);
+                let body = format!(
+                    "<< /Type /Annot /Subtype /Widget /FT /Btn /T {name} /Rect [{x} {y} {r} {t}] /F 4 /Ff {flags} /P {page} 0 R /V {state} /AS {state} /MK << /BC [0 0 0] /BG [1 1 1] >> /BS << /W 1 /S /S >> /AP << /N << /Off {off} 0 R /Yes {on} 0 R >> >> >>",
+                    name = field_name,
+                    x = f(x),
+                    y = f(bottom),
+                    r = f(x + width),
+                    t = f(bottom + height),
+                    flags = flags,
+                    page = page_ids_first + placement.page,
+                    state = state,
+                    off = off_id,
+                    on = on_id,
+                );
+                w.indirect(widget_id, &body);
+                page_annots[placement.page as usize].push(widget_id);
+                top_level_field_ids.push(widget_id);
+            }
+            FORM_INTERACTIVE_TEXT => {
+                let widget_id = w.alloc(1);
+                let field_name = pdf_text_string(&form_field_name(&placement.field));
+                let field_value = pdf_text_string(&placement.field.value);
+                let default_value = pdf_text_string(&placement.field.default_value);
+                let placeholder = if placement.field.placeholder.is_empty() {
+                    String::new()
+                } else {
+                    format!(" /TU {}", pdf_text_string(&placement.field.placeholder))
+                };
+                let flags = form_flags_for_field(&placement.field);
+                let q = acro_quadding(placement.field.text_align);
+                let (x, bottom, width, height) = inset_form_rect(placement.rect, &placement.field);
+                let body = format!(
+                    "<< /Type /Annot /Subtype /Widget /FT /Tx /T {name} /Rect [{x} {y} {r} {t}] /F 4 /Ff {flags} /P {page} 0 R /DA (/Helv 10 Tf 0 g) /Q {q} /BS << /W 0 >> /MK << >> /V {value} /DV {default}{placeholder} >>",
+                    name = field_name,
+                    x = f(x),
+                    y = f(bottom),
+                    r = f(x + width),
+                    t = f(bottom + height),
+                    flags = flags,
+                    page = page_ids_first + placement.page,
+                    q = q,
+                    value = field_value,
+                    default = default_value,
+                    placeholder = placeholder,
+                );
+                w.indirect(widget_id, &body);
+                page_annots[placement.page as usize].push(widget_id);
+                top_level_field_ids.push(widget_id);
+            }
+            FORM_INTERACTIVE_CHOICE => {
+                let widget_id = w.alloc(1);
+                let field_name = pdf_text_string(&form_field_name(&placement.field));
+                let selected_values: Vec<String> = placement
+                    .field
+                    .options
+                    .iter()
+                    .filter(|option| option.selected)
+                    .map(|option| pdf_text_string(&option.value))
+                    .collect();
+                let value = if placement.field.multiple {
+                    format!("[{}]", selected_values.join(" "))
+                } else if let Some(first) = selected_values.first() {
+                    first.clone()
+                } else {
+                    pdf_text_string(&placement.field.value)
+                };
+                let default_value = if placement.field.default_value.is_empty() {
+                    value.clone()
+                } else {
+                    pdf_text_string(&placement.field.default_value)
+                };
+                let opt = placement
+                    .field
+                    .options
+                    .iter()
+                    .map(|option| {
+                        format!(
+                            "[{} {}]",
+                            pdf_text_string(&option.value),
+                            pdf_text_string(&option.label)
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                let flags = form_flags_for_field(&placement.field);
+                let q = acro_quadding(placement.field.text_align);
+                let (x, bottom, width, height) = inset_form_rect(placement.rect, &placement.field);
+                let body = format!(
+                    "<< /Type /Annot /Subtype /Widget /FT /Ch /T {name} /Rect [{x} {y} {r} {t}] /F 4 /Ff {flags} /P {page} 0 R /DA (/Helv 10 Tf 0 g) /Q {q} /BS << /W 0 >> /MK << >> /Opt [{opt}] /V {value} /DV {default} >>",
+                    name = field_name,
+                    x = f(x),
+                    y = f(bottom),
+                    r = f(x + width),
+                    t = f(bottom + height),
+                    flags = flags,
+                    page = page_ids_first + placement.page,
+                    q = q,
+                    opt = opt,
+                    value = value,
+                    default = default_value,
+                );
+                w.indirect(widget_id, &body);
+                page_annots[placement.page as usize].push(widget_id);
+                top_level_field_ids.push(widget_id);
+            }
+            _ => {
+                let _ = placement.field.kind == FORM_KIND_TEXT
+                    || placement.field.kind == FORM_KIND_TEXTAREA
+                    || placement.field.kind == FORM_KIND_SELECT
+                    || placement.field.kind == FORM_KIND_CHECKBOX
+                    || placement.field.kind == FORM_KIND_DATE_TIME;
+            }
+        }
+    }
+
+    for (_group_key, members) in radio_groups.iter() {
+        if members.is_empty() {
+            continue;
+        }
+        let parent_id = w.alloc(1);
+        let mut kids = String::new();
+        let mut selected_name = String::from("/Off");
+        for member in members {
+            let off_id = w.alloc(1);
+            let on_id = w.alloc(1);
+            let widget_id = w.alloc(1);
+            let (_, _, w_pt, h_pt) = member.rect;
+            w.stream(off_id, &format!(" /Type /XObject /Subtype /Form /BBox [0 0 {} {}]", f(w_pt), f(h_pt)), &radio_appearance_stream(w_pt, h_pt, false));
+            w.stream(on_id, &format!(" /Type /XObject /Subtype /Form /BBox [0 0 {} {}]", f(w_pt), f(h_pt)), &radio_appearance_stream(w_pt, h_pt, true));
+            let on_state_name = pdf_name_token(&format!("R{}", member.field.id));
+            let state = if member.field.checked {
+                selected_name = format!("/{}", on_state_name);
+                format!("/{}", on_state_name)
+            } else {
+                String::from("/Off")
+            };
+            let (x, bottom, width, height) = member.rect;
+            let body = format!(
+                "<< /Type /Annot /Subtype /Widget /Parent {parent} 0 R /Rect [{x} {y} {r} {t}] /F 4 /P {page} 0 R /MK << /BC [0 0 0] /BG [1 1 1] >> /BS << /W 1 /S /S >> /AP << /N << /Off {off} 0 R /{on_state} {on} 0 R >> >> /AS {state} >>",
+                parent = parent_id,
+                x = f(x),
+                y = f(bottom),
+                r = f(x + width),
+                t = f(bottom + height),
+                page = page_ids_first + member.page,
+                off = off_id,
+                on_state = on_state_name,
+                on = on_id,
+                state = state,
+            );
+            w.indirect(widget_id, &body);
+            kids.push_str(&format!("{} 0 R ", widget_id));
+            page_annots[member.page as usize].push(widget_id);
+        }
+        let parent_field = &members[0].field;
+        let parent_name = pdf_text_string(&form_field_name(parent_field));
+        let flags = button_flags_for_field(parent_field, true);
+        let body = format!(
+            "<< /FT /Btn /T {name} /Ff {flags} /Kids [{}] /V {} >>",
+            kids.trim(),
+            selected_name,
+            name = parent_name,
+            flags = flags,
+        );
+        w.indirect(parent_id, &body);
+        top_level_field_ids.push(parent_id);
+    }
+
+    if let Some(acroform_id) = acroform_id {
+        let fields = top_level_field_ids
+            .iter()
+            .map(|id| format!("{} 0 R", id))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let body = format!(
+            "<< /Fields [{}] /NeedAppearances true /DR << /Font << /Helv {} 0 R >> >> /DA (/Helv 10 Tf 0 g) >>",
+            fields,
+            helvetica_first_id,
+        );
+        w.indirect(acroform_id, &body);
+    }
+
     // Content streams.
     for (i, p) in pages.iter().enumerate() {
         let cid = content_ids_first + i as u32;
@@ -2174,7 +2756,7 @@ pub fn build_pdf(
         }
         let media_h = p.media_h.unwrap_or(snap.page_height_pt);
         let body = format!(
-            "<< /Type /Page /Parent {pages} 0 R /MediaBox [0 0 {pw} {ph}] /Resources << {font}{xobj}{extgstate}>> /Contents {cid} 0 R >>",
+            "<< /Type /Page /Parent {pages} 0 R /MediaBox [0 0 {pw} {ph}] /Resources << {font}{xobj}{extgstate}>> /Contents {cid} 0 R{annots} >>",
             pages = pages_id,
             pw = f(snap.page_width_pt),
             ph = f(media_h),
@@ -2182,6 +2764,18 @@ pub fn build_pdf(
             xobj = xobj,
             extgstate = extgstate,
             cid = cid,
+            annots = if page_annots[i as usize].is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " /Annots [{}]",
+                    page_annots[i as usize]
+                        .iter()
+                        .map(|id| format!("{} 0 R", id))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                )
+            },
         );
         w.indirect(pid, &body);
         crate::emit_render_progress(i + 1, page_count);
@@ -2199,7 +2793,15 @@ pub fn build_pdf(
 
     w.indirect(
         catalog_id,
-        &format!("<< /Type /Catalog /Pages {} 0 R >>", pages_id),
+        &format!(
+            "<< /Type /Catalog /Pages {} 0 R{} >>",
+            pages_id,
+            if let Some(acroform_id) = acroform_id {
+                format!(" /AcroForm {} 0 R", acroform_id)
+            } else {
+                String::new()
+            }
+        ),
     );
 
     w.write_encrypt_obj();

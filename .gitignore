@@ -5,6 +5,7 @@ node_modules/
 /dist
 /tmp
 /build
+/web/.next/
 
 # Rust / WASM build artifacts
 /wasm/target/
@@ -34,6 +35,10 @@ debug.log
 .envrc
 .claude
 
+# TypeScript compiled output in src (rollup builds from .ts directly)
+src/**/*.js
+src/**/*.js.map
+
 # Test artifacts
 tests/reftests.js
 
@@ -42,4 +47,6 @@ diagnose-output.txt
 diagnose-stderr.txt
 scripts/diagnose-*.pdf
 
-deploy/
+.codex
+
+web

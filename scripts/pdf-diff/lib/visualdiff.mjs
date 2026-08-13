@@ -9,10 +9,13 @@
 // We map each element box into that page-image space with the exact same slice math
 // as createExpectedPageImage (page from meta.pageBreaks, scale by metrics.layoutScale)
 // and compare:
-//   bg-color — element's computed backgroundColor vs the dompdf raster interior (ΔE).
+//   bg-color — element's browser-painted interior vs the dompdf raster interior (ΔE).
+//   bg-missing-capture — element should have a painted interior, but dompdf matches the
+//                        surrounding backdrop instead, a signature of snapshot loss.
 //   border   — element's computed border color vs the dompdf raster edge strip (ΔE).
 //   shadow   — does the dompdf raster darken just outside the box like the browser does?
 //   icon     — localized expected-vs-actual pixel mismatch inside the icon box.
+//   raster-geometry-drift — a raster-like region aligns only after a large dx/dy offset.
 // Output mirrors textdiff: { summary, discrepancies:[{ kind, nodeId, box, expected, actual, delta }] }.
 
 import { PNG } from 'pngjs';
@@ -22,6 +25,7 @@ const BG_DELTA_E = 6; // CIE76 ΔE; <2.3 is imperceptible
 const BG_DECLARED_VISIBILITY_E = 10; // browser interior this far from declared bg => background is mostly covered by descendants
 const BG_Y_SEARCH_PX = 48; // tolerate small post-pagination y remaps when locating a box on the page raster
 const PAGE_CROSS_SEARCH_PX = 64; // boxes straddling a page break can legitimately land on an adjacent page after pagination
+const BG_SURROUND_DELTA_E = 5; // actual interior nearly matches surrounding backdrop
 const BORDER_MATCH_E = 20; // an edge pixel within this ΔE of the wanted color "is" the border
 const BORDER_MIN_PRESENCE = 0.1; // <10% of the edge strip showing the border color → missing/wrong
 const BORDER_REGION_MISMATCH = 0.12; // if expected/actual edge rasters already match, do not flag color-presence noise
@@ -29,6 +33,9 @@ const BORDER_REGION_MISMATCH_ROUNDED = 0.25; // large rounded thin borders antia
 const SHADOW_LUMA_DROP = 18; // browser band this much darker (0..255) than dompdf → shadow missing
 const ICON_MISMATCH = 0.25; // fraction of differing pixels in the icon box
 const ICON_PIXEL_DIST = 48; // per-pixel channel-sum distance counted as "different"
+const RASTER_DRIFT_MIN_OFFSET = 8; // px
+const RASTER_DRIFT_MIN_GAIN = 0.18; // mismatch ratio improvement
+const RASTER_DRIFT_MAX_SEARCH = 64; // px
 const GRID = 24; // max samples per axis when sampling a region
 
 function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
@@ -94,6 +101,23 @@ function sampleColor(png, rx, ry, rw, rh) {
   }
   if (rs.length === 0) return null;
   return { r: med(rs), g: med(gs), b: med(bs), n: rs.length };
+}
+
+function sampleSurroundColor(png, rx, ry, rw, rh) {
+  const band = Math.max(2, Math.round(Math.min(rw, rh) * 0.08));
+  const samples = [
+    sampleColor(png, rx, ry - band, rw, band),
+    sampleColor(png, rx, ry + rh, rw, band),
+    sampleColor(png, rx - band, ry, band, rh),
+    sampleColor(png, rx + rw, ry, band, rh),
+  ].filter(Boolean);
+  if (samples.length === 0) return null;
+  return {
+    r: med(samples.map((s) => s.r)),
+    g: med(samples.map((s) => s.g)),
+    b: med(samples.map((s) => s.b)),
+    n: samples.reduce((sum, s) => sum + (s.n || 0), 0),
+  };
 }
 
 function bestVerticalColorSample(png, truth, rx, ry, rw, rh, searchPx) {
@@ -222,6 +246,24 @@ function regionMismatch(expPng, actPng, rx, ry, rw, rh) {
   return total === 0 ? null : diff / total;
 }
 
+function bestOffsetMismatch(expPng, actPng, rx, ry, rw, rh, searchPx) {
+  const deltas = [0];
+  for (let d = 4; d <= searchPx; d += 4) deltas.push(d, -d);
+  let best = null;
+  for (const dy of deltas) {
+    for (const dx of deltas) {
+      if (dx === 0 && dy === 0) continue;
+      const ratio = regionMismatch(expPng, actPng, rx + dx, ry + dy, rw, rh);
+      if (ratio == null) continue;
+      const dist = Math.hypot(dx, dy);
+      if (!best || ratio < best.ratio || (ratio === best.ratio && dist < best.distance)) {
+        best = { ratio, dx, dy, distance: dist };
+      }
+    }
+  }
+  return best;
+}
+
 // Element (root-css-px) → page index + slice start, using the page-break positions.
 function pageForY(y, meta) {
   const breaks = Array.isArray(meta.pageBreaks) ? meta.pageBreaks : [];
@@ -260,7 +302,7 @@ export function diffVisuals({ elements, pixelPages, meta, metrics }) {
   const els = Array.isArray(elements) ? elements : [];
   const pages = Array.isArray(pixelPages) ? pixelPages : [];
   const scale = metrics.layoutScale || 1;
-  const counts = { 'bg-color': 0, border: 0, shadow: 0, icon: 0 };
+  const counts = { 'bg-color': 0, 'bg-missing-capture': 0, border: 0, shadow: 0, icon: 0, 'raster-geometry-drift': 0 };
   const discrepancies = [];
   const deltaEs = [];
 
@@ -289,7 +331,7 @@ export function diffVisuals({ elements, pixelPages, meta, metrics }) {
     // painted image content covers the background, so the box interior is the image,
     // not the declared background-color).
     const bg = parseCssColor(el.backgroundColor);
-    if (bg && bg.a >= 0.95 && !el.isIcon) {
+    if (el.backgroundColor && !el.isIcon) {
       const inset = 0.25;
       const rx = ix + iw * inset;
       const ry = iy + ih * inset;
@@ -304,9 +346,9 @@ export function diffVisuals({ elements, pixelPages, meta, metrics }) {
       // Only flag when the PDF interior actually diverges from the browser interior.
       // (Fall back to the declared color only when no browser raster is available.)
       const ref = expected ? sampleColor(expected, rx, ry, rw, rh) : null;
-      if (ref && deltaE(ref, bg) > BG_DECLARED_VISIBILITY_E) continue;
-      const truth = ref || bg;
-      if (got) {
+      if (ref && bg && deltaE(ref, bg) > BG_DECLARED_VISIBILITY_E) continue;
+      const truth = ref || (bg && bg.a >= 0.95 ? bg : null);
+      if (got && truth) {
         let de = deltaE(truth, got);
         if (de > BG_DELTA_E && Array.isArray(meta?.pageBreaks) && meta.pageBreaks.length > 0) {
           const best = bestVerticalColorSample(actual, truth, rx, ry, rw, rh, BG_Y_SEARCH_PX);
@@ -316,14 +358,22 @@ export function diffVisuals({ elements, pixelPages, meta, metrics }) {
           }
         }
         if (de > BG_DELTA_E) {
-          counts['bg-color'] += 1;
+          const surround = sampleSurroundColor(actual, rx, ry, rw, rh);
+          const kind = surround && deltaE(got, surround) <= BG_SURROUND_DELTA_E
+            ? 'bg-missing-capture'
+            : 'bg-color';
+          counts[kind] += 1;
           deltaEs.push(de);
           discrepancies.push({
             ...base,
-            kind: 'bg-color',
+            kind,
             expected: rgbHex(truth),
             actual: rgbHex(got),
-            delta: { deltaE: round(de), declared: rgbHex(bg) },
+            delta: {
+              deltaE: round(de),
+              declared: bg ? rgbHex(bg) : undefined,
+              actualVsSurround: surround ? round(deltaE(got, surround)) : undefined,
+            },
           });
         }
       }
@@ -429,6 +479,32 @@ export function diffVisuals({ elements, pixelPages, meta, metrics }) {
           actual: `${Math.round(ratio * 100)}% of icon box differs`,
           delta: { mismatchRatio: round(ratio) },
         });
+      }
+    }
+
+    const rasterLike = Boolean(el.backgroundImage || el.hasPseudoBefore || el.hasPseudoAfter);
+    if (rasterLike && expected) {
+      const baseMismatch = regionMismatch(expected, actual, ix, iy, iw, ih);
+      if (baseMismatch != null && baseMismatch > ICON_MISMATCH) {
+        const best = bestOffsetMismatch(expected, actual, ix, iy, iw, ih, RASTER_DRIFT_MAX_SEARCH);
+        if (best
+          && best.distance >= RASTER_DRIFT_MIN_OFFSET
+          && (baseMismatch - best.ratio) >= RASTER_DRIFT_MIN_GAIN
+          && best.ratio < baseMismatch * 0.7) {
+          counts['raster-geometry-drift'] += 1;
+          discrepancies.push({
+            ...base,
+            kind: 'raster-geometry-drift',
+            expected: `raster-like box aligned at (${round(el.x)}, ${round(el.y)})`,
+            actual: `best alignment requires offset dx=${round(best.dx / scale)}, dy=${round(best.dy / scale)}`,
+            delta: {
+              mismatchRatio: round(baseMismatch),
+              bestMismatchRatio: round(best.ratio),
+              dx: round(best.dx / scale),
+              dy: round(best.dy / scale),
+            },
+          });
+        }
       }
     }
   }
